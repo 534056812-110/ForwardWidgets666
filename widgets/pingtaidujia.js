@@ -1,9 +1,9 @@
 WidgetMetadata = {
-  id: "gemini.platform.originals.ui.fix",
-  title: "流媒体·独家原创 (UI修复)",
-  author: "Gemini",
-  description: "Netflix/HBO/腾讯/B站 自制内容，UI 样式与影视榜单一致",
-  version: "4.0.0",
+  id: "platform.originals.ui.fix",
+  title: "流媒体·独家原创",
+  author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+  description: "Netflix/HBO/腾讯/B站…自制内容",
+  version: "1.0.4",
   requiredVersion: "0.0.1",
   // 1. 全局参数 (Global)
   globalParams: [
