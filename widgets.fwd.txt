@@ -1,6 +1,6 @@
 {
-  "title": "huangxd's Widgets",
-  "description": "【30% off code：CHEAP】A collection of widgets created by huangxd",
+  "title": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖'𝙨 𝙒𝙞𝙙𝙜𝙚𝙩𝙨",
+  "description": "汇聚追剧日历,流媒体top10,烂番茄好评榜 等追剧模块",
   "icon": "https://github.com/huangxd-/ForwardWidgets/raw/main/icon.png",
   "widgets": [
     {
@@ -12,7 +12,7 @@
       "author": "huangxd",
       "url": "https://raw.githubusercontent.com/huangxd-/ForwardWidgets/refs/heads/main/widgets/douban.js"
     },
-    {
+    
       "id": "trakt",
       "title": "Trakt我看&Trakt个性化推荐",
       "description": "解析Trakt想看、在看、已看、片单、追剧日历以及根据个人数据生成的个性化推荐【30% off code：CHEAP】",
