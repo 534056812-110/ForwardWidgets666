@@ -1,26 +1,32 @@
 WidgetMetadata = {
-    id: "whattowatch_pro",
+    id: "whattowatch_fix",
     title: "今天看什么",
     author: "MakkaPakka",
-    description: "剧荒拯救者。支持基于 Trakt 历史推荐，或完全随机发现。",
-    version: "1.2.0",
+    description: "剧荒拯救者。支持 Trakt 历史推荐与随机发现，增强容错。",
+    version: "2.1.0",
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
-    // 1. 全局参数
     globalParams: [
         {
             name: "apiKey",
             title: "TMDB API Key (必填)",
             type: "input",
-            description: "用于获取推荐数据。",
+            description: "必须填写",
             value: ""
         },
         {
             name: "traktUser",
             title: "Trakt 用户名 (可选)",
             type: "input",
-            description: "填入后可根据你的观看历史进行个性化推荐。",
+            description: "填入 Trakt 个人主页网址末尾的 ID (slug)",
+            value: ""
+        },
+        {
+            name: "traktClientId",
+            title: "Trakt Client ID (选填)",
+            type: "input",
+            description: "如遇 Trakt Error 请自行申请并填入",
             value: ""
         }
     ],
@@ -29,8 +35,8 @@ WidgetMetadata = {
         {
             title: "今天看什么",
             functionName: "loadRecommendations",
-            type: "video", // 使用标准 video 类型
-            cacheDuration: 0, // 不缓存，每次点击都刷新
+            type: "video",
+            cacheDuration: 0,
             params: [
                 {
                     name: "mediaType",
@@ -47,64 +53,69 @@ WidgetMetadata = {
     ]
 };
 
-// Trakt 公共 Client ID (兜底用)
-const TRAKT_CLIENT_ID = "003666572e92c4331002a28114387693994e43f5454659f81640a232f08a5996";
+// 备用 ID (如果默认的挂了，用户可以不填直接用这个)
+const DEFAULT_TRAKT_ID = "003666572e92c4331002a28114387693994e43f5454659f81640a232f08a5996";
 
 async function loadRecommendations(params = {}) {
-    // 1. 获取参数
     const { apiKey, traktUser, mediaType = "tv" } = params;
+    // 优先用用户填的 ID，没有则用默认
+    const traktClientId = params.traktClientId || DEFAULT_TRAKT_ID;
 
     if (!apiKey) {
         return [{
-            id: "err_no_key",
+            id: "err_key",
             type: "text",
             title: "配置缺失",
-            subTitle: "请在设置中填入 TMDB API Key"
+            subTitle: "请在设置中填写 TMDB API Key"
         }];
     }
 
     let results = [];
-    let reason = ""; // 推荐理由
+    let reason = "";
 
-    // 2. 分流逻辑
+    // === 逻辑分流 ===
     if (traktUser) {
-        // === 模式 A: 个性化推荐 (基于 Trakt 历史) ===
-        console.log(`[Mode] Trakt Personalized: ${traktUser}`);
-        const historyItem = await fetchLastWatched(traktUser, mediaType);
-        
-        if (historyItem && historyItem.tmdbId) {
-            reason = `因为你看过: ${historyItem.title}`;
-            results = await fetchTmdbRecommendations(historyItem.tmdbId, mediaType, apiKey);
-        } else {
-            reason = "暂无 Trakt 记录，已切换至随机推荐";
+        console.log(`[Mode] Trakt: ${traktUser}`);
+        try {
+            // 尝试获取 Trakt 历史
+            const historyItem = await fetchLastWatched(traktUser, mediaType, traktClientId);
+            
+            if (historyItem && historyItem.tmdbId) {
+                // 成功：获取相似推荐
+                reason = `因为你看过: ${historyItem.title}`;
+                results = await fetchTmdbRecommendations(historyItem.tmdbId, mediaType, apiKey);
+            } else {
+                // 失败（无记录）：回退随机
+                reason = "未找到观看记录，随机推荐";
+                results = await fetchRandomTmdb(mediaType, apiKey);
+            }
+        } catch (e) {
+            // 失败（API 错误）：回退随机，并提示错误
+            console.error("Trakt Fail:", e);
+            reason = `Trakt 连接失败 (${e.message})，随机推荐`;
             results = await fetchRandomTmdb(mediaType, apiKey);
         }
     } else {
-        // === 模式 B: 完全随机发现 ===
-        console.log(`[Mode] Random Discovery`);
+        // 无 Trakt 用户：直接随机
         reason = "🎲 随机发现";
         results = await fetchRandomTmdb(mediaType, apiKey);
     }
 
-    // 3. 结果处理
+    // === 结果处理 ===
     if (!results || results.length === 0) {
         return [{
             id: "err_empty",
             type: "text",
-            title: "没找到推荐",
-            subTitle: "请重试或检查网络"
+            title: "未找到推荐",
+            subTitle: "可能是 TMDB 连接失败，请检查网络"
         }];
     }
 
-    // 4. 格式化输出 (只取前 12 个)
+    // 格式化输出
     return results.slice(0, 12).map(item => {
-        // 优先使用中文名
         const title = item.name || item.title;
-        const originalName = item.original_name || item.original_title;
+        const orgTitle = item.original_name || item.original_title;
         
-        // 副标题显示推荐理由，增强交互感
-        const subTitle = reason;
-
         return {
             id: String(item.id),
             tmdbId: parseInt(item.id),
@@ -112,8 +123,9 @@ async function loadRecommendations(params = {}) {
             mediaType: mediaType,
             
             title: title,
-            subTitle: subTitle,
-            description: item.overview || `原名: ${originalName}`,
+            // 在副标题显示来源或错误提示，让用户知道发生了什么
+            subTitle: reason, 
+            description: item.overview || `原名: ${orgTitle}`,
             
             posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
             backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
@@ -124,95 +136,66 @@ async function loadRecommendations(params = {}) {
     });
 }
 
-// ==========================================
-// 工具函数
-// ==========================================
+// === 工具函数 ===
 
-/**
- * 获取 Trakt 用户最后观看的一部剧/电影
- */
-async function fetchLastWatched(username, type) {
-    // type 转换: tmdb "tv" -> trakt "shows", tmdb "movie" -> trakt "movies"
+async function fetchLastWatched(username, type, clientId) {
     const traktType = type === "tv" ? "shows" : "movies";
-    // 加上 extended=full 以获取更多信息，加上 limit=1 只取最后一条
-    const url = `https://api.trakt.tv/users/${username}/history/${traktType}?limit=1&extended=full`;
+    // 增加 timeout 防止卡死
+    const url = `https://api.trakt.tv/users/${username}/history/${traktType}?limit=1`;
     
-    try {
-        const res = await Widget.http.get(url, {
-            headers: {
-                "Content-Type": "application/json",
-                "trakt-api-version": "2",
-                "trakt-api-key": TRAKT_CLIENT_ID
-            }
-        });
-        
-        const data = res.data || [];
-        if (data.length > 0) {
-            const item = data[0];
-            // Trakt 返回结构: { id: ..., show: { title: ..., ids: { tmdb: ... } } }
-            const work = item.show || item.movie;
-            if (work && work.ids && work.ids.tmdb) {
-                return {
-                    tmdbId: work.ids.tmdb,
-                    title: work.title
-                };
-            }
+    // 这里不再内部 catch，而是抛出错误给主函数处理
+    const res = await Widget.http.get(url, {
+        headers: {
+            "Content-Type": "application/json",
+            "trakt-api-version": "2",
+            "trakt-api-key": clientId
+        },
+        timeout: 5000 // 5秒超时
+    });
+
+    if (res.statusCode === 404) throw new Error("用户未找到");
+    if (res.statusCode === 403) throw new Error("隐私设置受限");
+    if (res.statusCode >= 400) throw new Error(`API ${res.statusCode}`);
+
+    const data = res.data || [];
+    if (data.length > 0) {
+        const item = data[0];
+        const work = item.show || item.movie;
+        if (work?.ids?.tmdb) {
+            return { tmdbId: work.ids.tmdb, title: work.title };
         }
-    } catch (e) {
-        console.error("Trakt Error:", e);
     }
     return null;
 }
 
-/**
- * TMDB: 根据 ID 推荐相似 (Recommendations)
- */
-async function fetchTmdbRecommendations(seedId, mediaType, apiKey) {
-    const url = `https://api.themoviedb.org/3/${mediaType}/${seedId}/recommendations?api_key=${apiKey}&language=zh-CN&page=1`;
-    
+async function fetchTmdbRecommendations(id, type, key) {
+    const url = `https://api.themoviedb.org/3/${type}/${id}/recommendations?api_key=${key}&language=zh-CN&page=1`;
     try {
         const res = await Widget.http.get(url);
-        const data = res.data || {};
-        return data.results || [];
-    } catch (e) {
-        return [];
-    }
+        return (res.data || {}).results || [];
+    } catch (e) { return []; }
 }
 
-/**
- * TMDB: 随机发现 (Discover with Random Page)
- */
-async function fetchRandomTmdb(mediaType, apiKey) {
-    // 1. 随机参数生成
-    // 随机页码 (1-50页)
-    const randomPage = Math.floor(Math.random() * 50) + 1;
-    // 随机年份 (2010 - 2024)，保证不总是推荐老片
-    const randomYear = Math.floor(Math.random() * (2024 - 2010 + 1)) + 2010;
+async function fetchRandomTmdb(type, key) {
+    // 随机因子：页码 + 年份
+    const page = Math.floor(Math.random() * 30) + 1;
+    const year = Math.floor(Math.random() * (2024 - 2015 + 1)) + 2015;
     
-    // 构造 Discover URL
-    let url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${apiKey}&language=zh-CN&sort_by=popularity.desc&include_adult=false&vote_count.gte=200&page=${randomPage}`;
+    let url = `https://api.themoviedb.org/3/discover/${type}?api_key=${key}&language=zh-CN&sort_by=popularity.desc&include_adult=false&vote_count.gte=100&page=${page}`;
     
-    // 加上年份筛选，增加随机性维度
-    if (mediaType === "movie") {
-        url += `&primary_release_year=${randomYear}`;
-    } else {
-        url += `&first_air_date_year=${randomYear}`;
-    }
+    // 加入年份限制，避免太老的片
+    if (type === "movie") url += `&primary_release_year=${year}`;
+    else url += `&first_air_date_year=${year}`;
 
     try {
         const res = await Widget.http.get(url);
-        const data = res.data || {};
-        let items = data.results || [];
+        let items = (res.data || {}).results || [];
         
-        // 2. 再次打乱当前页的顺序 (洗牌算法)
-        // 即使请求同一页，展示顺序也不同
+        // 洗牌算法打乱
         for (let i = items.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [items[i], items[j]] = [items[j], items[i]];
         }
-        
         return items;
-    } catch (e) {
-        return [];
-    }
+    } catch (e) { return []; }
 }
