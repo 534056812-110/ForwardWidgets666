@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "Trakt 惊喜推荐",
     author: "MakkaPakka",
     description: "从你最近观看的剧集中随机抽取 5 部剧，推荐相似的剧集，每 12 小时刷新一次。",
-    version: "3.0.0",
+    version: "1.0.6",
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
@@ -31,14 +31,13 @@ WidgetMetadata = {
             value: ""
         }
     ],
-
     modules: [
         {
             title: "今日惊喜推荐",
             functionName: "loadRandomMix",
-            type: "video", // 使用标准 video 类型
-            cacheDuration: 43200, // 缓存 12 小时
-            params: [] // 无需额外参数，全靠全局配置
+            type: "list", // 推荐使用 list 类型以支持 genreTitle
+            cacheDuration: 43200, 
+            params: [] 
         }
     ]
 };
@@ -46,64 +45,49 @@ WidgetMetadata = {
 // 默认公共 ID
 const DEFAULT_TRAKT_ID = "003666572e92c4331002a28114387693994e43f5454659f81640a232f08a5996";
 
+// TMDB 类型映射
+const GENRE_MAP = {
+    10759: "动作冒险", 16: "动画", 35: "喜剧", 80: "犯罪", 99: "纪录片",
+    18: "剧情", 10751: "家庭", 10762: "儿童", 9648: "悬疑", 10763: "新闻",
+    10764: "真人秀", 10765: "科幻奇幻", 10766: "肥皂剧", 10767: "脱口秀",
+    10768: "战争政治", 37: "西部"
+};
+
 async function loadRandomMix(params = {}) {
     const { apiKey, traktUser } = params;
     const clientId = params.clientId || DEFAULT_TRAKT_ID;
 
     if (!apiKey || !traktUser) {
-        return [{
-            id: "err_missing",
-            type: "text",
-            title: "参数缺失",
-            subTitle: "请在设置中填写 TMDB Key 和 Trakt 用户名"
-        }];
+        return [{ id: "err_missing", type: "text", title: "参数缺失", subTitle: "请在设置中填写 TMDB Key 和 Trakt 用户名" }];
     }
 
-    // 1. 获取去重后的观看历史池 (Max 100 条记录 -> 提取 unique shows)
     const uniqueShows = await fetchUniqueHistory(traktUser, clientId);
-
     if (uniqueShows.length === 0) {
-        return [{
-            id: "err_empty",
-            type: "text",
-            title: "暂无记录",
-            subTitle: "Trakt 历史为空或账号私密"
-        }];
+        return [{ id: "err_empty", type: "text", title: "暂无记录", subTitle: "Trakt 历史为空或账号私密" }];
     }
 
-    // 2. 截取最近的 30 部作为候选池
     const candidatePool = uniqueShows.slice(0, 30);
-    console.log(`[Mix] Pool: ${uniqueShows.length}, Candidates: ${candidatePool.length}`);
+    console.log(`[Mix] Candidates: ${candidatePool.length}`);
 
-    // 3. 随机抽取 5 部种子
     const pickCount = Math.min(candidatePool.length, 5);
     const seeds = getRandomSeeds(candidatePool, pickCount);
     
-    // 打印日志方便调试
-    const seedTitles = seeds.map(s => s.title).join(", ");
-    console.log(`[Mix] Seeds: ${seedTitles}`);
+    console.log(`[Mix] Seeds: ${seeds.map(s => s.title).join(", ")}`);
 
-    // 4. 并发获取推荐
     const promiseList = seeds.map(seed => fetchTmdbRecs(seed, apiKey));
     const resultsArray = await Promise.all(promiseList);
 
-    // 5. 混合洗牌算法 (Interleave)
-    // 将 5 组推荐结果交叉合并: [A1, B1, C1, D1, E1, A2, B2...]
     const mixedList = [];
     let maxRecsLen = 0;
-    
-    // 找出最长的一组
     for (const list of resultsArray) {
         if (list.length > maxRecsLen) maxRecsLen = list.length;
     }
 
-    // 交叉循环
     const seenIds = new Set();
     for (let i = 0; i < maxRecsLen; i++) {
         for (const list of resultsArray) {
             if (i < list.length) {
                 const item = list[i];
-                // 严格去重
                 if (!seenIds.has(item.tmdbId)) {
                     seenIds.add(item.tmdbId);
                     mixedList.push(item);
@@ -112,16 +96,9 @@ async function loadRandomMix(params = {}) {
         }
     }
 
-    // 限制最终展示数量 (20 个)
     const finalItems = mixedList.slice(0, 20);
-
     if (finalItems.length === 0) {
-        return [{
-            id: "err_tmdb",
-            type: "text",
-            title: "无推荐结果",
-            subTitle: "TMDB 暂无相关推荐数据"
-        }];
+        return [{ id: "err_tmdb", type: "text", title: "无推荐结果", subTitle: "TMDB 暂无相关推荐数据" }];
     }
 
     return finalItems;
@@ -132,39 +109,25 @@ async function loadRandomMix(params = {}) {
 // ==========================================
 
 async function fetchUniqueHistory(username, clientId) {
-    // limit=100 获取足够的样本以供去重
     const url = `https://api.trakt.tv/users/${username}/history/shows?limit=100`;
-    
     try {
         const res = await Widget.http.get(url, {
-            headers: {
-                "Content-Type": "application/json",
-                "trakt-api-version": "2",
-                "trakt-api-key": clientId
-            },
+            headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": clientId },
             timeout: 5000
         });
-        
         const data = res.data || [];
         if (!Array.isArray(data)) return [];
-
         const uniqueMap = new Map();
         for (const item of data) {
             const show = item.show;
             if (show && show.ids && show.ids.tmdb) {
                 if (!uniqueMap.has(show.ids.tmdb)) {
-                    uniqueMap.set(show.ids.tmdb, {
-                        tmdbId: show.ids.tmdb,
-                        title: show.title
-                    });
+                    uniqueMap.set(show.ids.tmdb, { tmdbId: show.ids.tmdb, title: show.title });
                 }
             }
         }
         return Array.from(uniqueMap.values());
-    } catch (e) {
-        console.error("History Error:", e);
-        return [];
-    }
+    } catch (e) { return []; }
 }
 
 function getRandomSeeds(array, count) {
@@ -181,24 +144,41 @@ async function fetchTmdbRecs(seedItem, apiKey) {
         
         if (!data.results) return [];
 
-        // 每部种子只取前 5 个高分推荐
-        return data.results.slice(0, 5).map(item => ({
-            id: String(item.id),
-            tmdbId: parseInt(item.id),
-            type: "tmdb",
-            mediaType: "tv",
+        return data.results.slice(0, 5).map(item => {
+            // 1. 类型处理
+            const genreText = (item.genre_ids || [])
+                .map(id => GENRE_MAP[id])
+                .filter(Boolean)
+                .slice(0, 2)
+                .join(" / ");
             
-            title: item.name || item.title,
-            
-            // 核心修改：将来源放在 subTitle，更显眼
-            subTitle: `✨ 源于: ${seedItem.title}`,
-            description: item.overview || `原名: ${item.original_name}`,
-            
-            posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
-            backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
-            
-            rating: item.vote_average ? item.vote_average.toFixed(1) : "0.0",
-            year: (item.first_air_date || "").substring(0, 4)
-        }));
+            // 2. 年份处理
+            const year = (item.first_air_date || "").substring(0, 4);
+            const score = item.vote_average ? item.vote_average.toFixed(1) : "0.0";
+
+            return {
+                id: String(item.id),
+                tmdbId: parseInt(item.id),
+                type: "tmdb",
+                mediaType: "tv",
+                
+                title: item.name || item.title,
+                
+                // 【核心修改】年份 • 类型
+                genreTitle: [year, genreText].filter(Boolean).join(" • "),
+                
+                // 副标题：推荐来源 (最重要信息)
+                subTitle: `✨ 源于: ${seedItem.title}`,
+                
+                // 简介：评分 + 剧情
+                description: `⭐ ${score} | ${item.overview || "暂无简介"}`,
+                
+                posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
+                backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
+                
+                rating: score,
+                year: year
+            };
+        });
     } catch (e) { return []; }
 }
