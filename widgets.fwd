@@ -53,7 +53,7 @@
       "title": "全球影视 & 分流聚合",
       "description": "集大成之作：Trakt全球榜 + 豆瓣高分榜 + 平台分流片库",
       "requiredVersion": "0.0.1",
-      "version": "1.2.5",
+      "version": "1.2.6",
       "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
       "url": "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/cn-int-bangdan.js"
     },
@@ -98,7 +98,7 @@
       "title": "流媒体·独家原创",
       "description": "Netflix/HBO/腾讯/B站…自制内容",
       "requiredVersion": "0.0.1",
-      "version": "1.0.6",
+      "version": "1.0.4",
       "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
       "url": "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/pingtaidujia.js"
     },
