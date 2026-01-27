@@ -1,6 +1,6 @@
 WidgetMetadata = {
   id: "forward.danmu.multi.pro",
-  title: "弹幕api增强版",
+  title: "弹幕Api增强版",
   version: "2.0.0",
   requiredVersion: "0.0.2",
   description: "支持多弹幕源切换，内置简繁体实时转换功能",
