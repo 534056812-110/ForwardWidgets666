@@ -31,6 +31,15 @@
       "url": "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/todaywatch.js"
     },
     {
+      "id": "today.history",
+      "title": "历史上的今天",
+      "description": "历史上的今天都上映了哪些电影?",
+      "requiredVersion": "0.0.1",
+      "version": "2.1.1",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/todayhistory.js"
+    },
+    {
       "id": "flixpatrol.strict",
       "title": "国外流媒体 TOP10 榜单",
       "description": "抓取 Netflix/HBO等平台 官方榜单",
