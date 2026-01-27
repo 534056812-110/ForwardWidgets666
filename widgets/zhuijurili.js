@@ -4,7 +4,7 @@ WidgetMetadata = {
   title: "全球追剧日历",
   author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
   description: "根据TMDB日期生成追剧日历",
-  version: "2.2.0",
+  version: "2.2.1",
   requiredVersion: "0.0.1",
   site: "https://www.themoviedb.org",
     
