@@ -1,17 +1,18 @@
 WidgetMetadata = {
-  id: "gemini.platform.originals.pro.v2",
-  title: "流媒体·独家原创 (增强版)",
+  id: "gemini.platform.originals.final",
+  title: "流媒体·独家原创 (全局Key版)",
   author: "Gemini",
-  description: "Netflix/HBO/腾讯/B站 自制内容，支持全局 Key 和类型标签展示",
-  version: "2.0.0",
+  description: "Netflix/HBO/腾讯/B站 自制内容，支持全局 Key 设置",
+  version: "3.0.0",
   requiredVersion: "0.0.1",
-  // 1. 全局输入 (Global Settings)
-  inputs: [
+  // 1. 正确的全局参数定义
+  globalParams: [
     {
-      name: "globalApiKey",
-      title: "TMDB API Key (全局)",
+      name: "apiKey",
+      title: "TMDB API Key (必填)",
       type: "input",
-      description: "在此处填入 Key，所有模块自动使用",
+      description: "用于获取数据。请在 themoviedb.org 申请。",
+      value: ""
     }
   ],
   modules: [
@@ -73,7 +74,7 @@ WidgetMetadata = {
   ]
 };
 
-// 类型 ID 映射表
+// TMDB TV 类型映射表
 const GENRE_MAP = {
     10759: "动作冒险", 16: "动画", 35: "喜剧", 80: "犯罪", 99: "纪录片",
     18: "剧情", 10751: "家庭", 10762: "儿童", 9648: "悬疑", 10763: "新闻",
@@ -82,14 +83,14 @@ const GENRE_MAP = {
 };
 
 async function loadPlatformOriginals(params = {}) {
-  // 1. 获取全局 Key
-  const apiKey = params.globalApiKey;
+  // 2. 直接从 params 中获取全局定义的 apiKey
+  const apiKey = params.apiKey;
   
   if (!apiKey) {
     return [{
       id: "err_no_key",
       title: "❌ 未配置 API Key",
-      subTitle: "请点击组件设置 -> GLOBAL 区域填写",
+      subTitle: "请在组件全局设置中填写 Key",
       type: "text"
     }];
   }
@@ -98,10 +99,13 @@ async function loadPlatformOriginals(params = {}) {
   const genreId = params.genre || "";
   const sortBy = params.sortBy || "popularity.desc";
 
+  // 构建 URL
   let url = `https://api.themoviedb.org/3/discover/tv?api_key=${apiKey}&language=zh-CN&include_adult=false&include_null_first_air_dates=false&page=1`;
   url += `&with_networks=${networkId}&sort_by=${sortBy}`;
   
   if (genreId) url += `&with_genres=${genreId}`;
+  
+  // 评分排序增加门槛，防止冷门高分
   if (sortBy.includes("vote_average")) url += `&vote_count.gte=200`;
 
   console.log(`[Originals] Net:${networkId} Sort:${sortBy}`);
@@ -111,16 +115,21 @@ async function loadPlatformOriginals(params = {}) {
     const data = res.data || res;
 
     if (!data.results || data.results.length === 0) {
-      return [{ id: "empty", title: "无数据", type: "text" }];
+      return [{ id: "empty", title: "该分类下无数据", type: "text" }];
     }
 
     return data.results.map(item => {
-        // 2. 处理类型标签
-        const genres = (item.genre_ids || []).map(id => GENRE_MAP[id]).filter(Boolean).slice(0, 3).join(" / ");
+        // 3. 类型标签转换
+        const genres = (item.genre_ids || [])
+            .map(id => GENRE_MAP[id])
+            .filter(Boolean)
+            .slice(0, 3) // 最多显示3个标签
+            .join(" / ");
         
-        // 3. 处理日期
+        // 4. 日期处理
         const date = item.first_air_date || "待定";
         const year = date.substring(0, 4);
+        const score = item.vote_average ? item.vote_average.toFixed(1) : "0.0";
 
         return {
             id: String(item.id),
@@ -130,17 +139,17 @@ async function loadPlatformOriginals(params = {}) {
             
             title: item.name || item.original_name,
             
-            // 副标题：日期 + 评分
-            subTitle: `${date} | ⭐ ${item.vote_average ? item.vote_average.toFixed(1) : "0.0"}`,
+            // 副标题：日期 | 评分
+            subTitle: `${date} | ⭐ ${score}`,
             
             posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
             backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
             
-            rating: item.vote_average ? item.vote_average.toFixed(1) : "0.0",
+            rating: score,
             year: year,
             
-            // 简介上方显示类型标签
-            description: genres ? `🎭 ${genres}\n${item.overview || ""}` : (item.overview || "暂无简介")
+            // 描述：类型标签 + 简介
+            description: genres ? `🏷️ ${genres}\n${item.overview || ""}` : (item.overview || "暂无简介")
         };
     });
 
