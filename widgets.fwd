@@ -40,6 +40,15 @@
       "url": "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/todayhistory.js"
     },
     {
+      "id": "ultimate_media_hub_lite",
+      "title": "全球影视 & 分流聚合",
+      "description": "集大成之作：Trakt全球榜 + 豆瓣高分榜 + 平台分流片库",
+      "requiredVersion": "0.0.1",
+      "version": "1.1.5",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/cn-int-bangdan.js"
+    },
+    {
       "id": "movie.collection",
       "title": "系列合集",
       "description": "一键获取 哈利波特，漫威等等剧集系列，或者手动搜索的电影系列",
