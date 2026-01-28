@@ -1,9 +1,9 @@
 WidgetMetadata = {
-    id: "javrate_pro",
-    title: "JavRate 浏览与播放",
+    id: "javrate_ultimate",
+    title: "JavRate 浏览器",
     author: "MakkaPakka",
-    description: "浏览 JavRate 高清视频，支持直连解析。",
-    version: "1.0.0",
+    description: "全套防爬Headers + 多重源解析，支持高清直连。",
+    version: "2.0.0",
     requiredVersion: "0.0.1",
     site: "https://javrate.com",
 
@@ -23,7 +23,7 @@ WidgetMetadata = {
                         { title: "🎬 有码 (Censored)", value: "censored" },
                         { title: "🔞 无码 (Uncensored)", value: "uncensored" },
                         { title: "🔥 热门影片", value: "trending" },
-                        { title: "🆕 最新发布", value: "new-release" }
+                        { title: "🆕 最新发布", value: "new-release" } // 对应首页
                     ] 
                 }
             ]
@@ -31,7 +31,22 @@ WidgetMetadata = {
     ]
 };
 
+// 1. 核心配置：照搬成功的 MissAV Headers
 const BASE_URL = "https://javrate.com";
+const HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    "Cache-Control": "no-cache",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+    "DNT": "1",
+    "Referer": BASE_URL,
+    "Connection": "keep-alive"
+};
 
 // ==========================================
 // 1. 列表加载
@@ -39,32 +54,26 @@ const BASE_URL = "https://javrate.com";
 async function loadList(params = {}) {
     const { page = 1, category = "censored" } = params;
     
-    // URL 构造 (根据 JavRate 实际路由调整)
-    // 假设: https://javrate.com/censored/page/2
+    // URL 构造
     let url = "";
     if (category === "new-release") {
-        url = `${BASE_URL}/page/${page}`; // 首页即最新
+        url = page > 1 ? `${BASE_URL}/page/${page}` : BASE_URL;
     } else {
-        url = `${BASE_URL}/${category}/page/${page}`;
+        url = page > 1 ? `${BASE_URL}/${category}/page/${page}` : `${BASE_URL}/${category}`;
     }
 
-    console.log(`[JavRate] Fetching: ${url}`);
-
     try {
-        const res = await Widget.http.get(url, {
-            headers: { 
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" 
-            }
-        });
-        
+        const res = await Widget.http.get(url, { headers: HEADERS });
         const html = res.data;
-        if (!html) return [];
+        
+        if (!html || html.length < 2000) {
+            return [{ id: "err", type: "text", title: "访问受限", subTitle: "网站可能开启了强力盾" }];
+        }
 
         const $ = Widget.html.load(html);
         const results = [];
 
-        // 解析列表
-        // JavRate 常见结构: article.post or div.video-block
+        // JavRate 结构: article.post
         $("article.post").each((i, el) => {
             const $el = $(el);
             const $link = $el.find("a").first();
@@ -73,18 +82,21 @@ async function loadList(params = {}) {
             if (href) {
                 const title = $el.find("h2.entry-title").text().trim();
                 const $img = $el.find("img");
+                // 优先 data-src
                 const img = $img.attr("data-src") || $img.attr("src");
                 
-                // 提取番号 (通常在标题里或者 meta 标签)
-                // 简单处理：标题就是番号+名称
-                
+                // 提取番号 (例如: [FHD/2.5G] IPX-123 ...)
+                const codeMatch = title.match(/([A-Z]{2,5}-\d{3,5})/);
+                const code = codeMatch ? codeMatch[1] : "JAV";
+
                 results.push({
                     id: href,
-                    type: "link", // 触发详情解析
+                    type: "link", 
                     title: title,
                     coverUrl: img,
                     link: href,
-                    customHeaders: { "Referer": BASE_URL }
+                    description: `番号: ${code}`,
+                    customHeaders: HEADERS // 传递 Headers
                 });
             }
         });
@@ -100,73 +112,69 @@ async function loadList(params = {}) {
 // ==========================================
 async function loadDetail(link) {
     try {
-        const res = await Widget.http.get(link, {
-            headers: { 
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Referer": BASE_URL
-            }
-        });
+        const res = await Widget.http.get(link, { headers: HEADERS });
         const html = res.data;
+        const $ = Widget.html.load(html);
+        const title = $("h1.entry-title").text().trim();
+
+        let videoUrl = "";
+
+        // --- 策略 A: 寻找直连 m3u8 (优先) ---
+        // JavRate 有时会直接把 m3u8 放在 source 标签或 var hls 变量里
         
-        // 核心：寻找播放地址
-        // JavRate 可能有多个播放源 (Tab)
-        // 1. 尝试找直连 m3u8
-        let m3u8Url = "";
-        
-        // 匹配 <source src="..."> 
-        const matchSource = html.match(/<source\s+src=['"]([^'"]+\.m3u8[^'"]*)['"]/i);
-        if (matchSource) m3u8Url = matchSource[1];
-        
-        // 匹配 var video_url = ...
-        if (!m3u8Url) {
-            const matchVar = html.match(/video_url\s*=\s*['"]([^'"]+)['"]/);
-            if (matchVar) m3u8Url = matchVar[1];
+        // 1. 正则全页面搜索 https://...m3u8
+        const m3u8Match = html.match(/(https?:\/\/[^"']+\.m3u8[^"']*)/);
+        if (m3u8Match) {
+            videoUrl = m3u8Match[1];
         }
 
-        // 2. 如果没找到直连，尝试找 iframe (可能是第三方播放器)
-        // 这部分比较复杂，通常只能支持特定的几种 (如 dood)
-        if (!m3u8Url) {
-            const matchIframe = html.match(/<iframe[^>]+src=['"]([^'"]+)['"]/i);
-            if (matchIframe) {
-                const iframeSrc = matchIframe[1];
-                // 如果是 doodstream，Forward 可能无法直接播，需要 WebView
-                // 但如果是 JavRate 自建的 player.php，可能里面藏着 m3u8
-                if (iframeSrc.includes("player")) {
-                    // 递归抓取 iframe 内容 (可选，比较耗时)
-                    // m3u8Url = await fetchIframe(iframeSrc);
-                }
+        // 2. 如果没找到，尝试找 Cloud Video (类似 MissAV 的 UUID)
+        if (!videoUrl) {
+            // JavRate 的播放器常嵌在 iframe 里，例如 https://javrate.com/player/Index.php?v=...
+            const iframeSrc = $("iframe").attr("src");
+            if (iframeSrc && iframeSrc.includes("player")) {
+                // 这里可能需要二次请求 iframe 页面去提取，但 Forward 不支持递归太深
+                // 我们可以尝试直接拼接: 很多 JavRate 的 iframe src 参数 v= 就是 m3u8 的一部分
+                // 但这比较玄学。
             }
         }
 
-        // 如果找到了地址
-        if (m3u8Url) {
-            const $ = Widget.html.load(html);
-            const title = $("h1.entry-title").text().trim();
-            
+        // --- 策略 B: Doodstream 降级 ---
+        // 如果找不到直连，但找到了 Doodstream iframe
+        if (!videoUrl && html.includes("dood")) {
+            // Forward 无法直接播 Dood，返回一个 Webview 类型的 Item 引导用户去网页看
+            // 或者提示用户
+            return [{
+                id: "dood_webview",
+                type: "webview", // 尝试用 WebView 打开
+                title: "点击在网页播放 (Doodstream)",
+                link: link,
+                description: "此视频源为 Doodstream，无法直接解析，请使用内置浏览器观看。"
+            }];
+        }
+
+        if (videoUrl) {
             return [{
                 id: link,
                 type: "video",
                 title: title,
-                videoUrl: m3u8Url,
+                videoUrl: videoUrl,
                 playerType: "system",
                 customHeaders: {
-                    "Referer": link, // 非常重要
-                    "User-Agent": "Mozilla/5.0"
+                    "Referer": link, // 关键：防盗链
+                    "User-Agent": HEADERS["User-Agent"]
                 }
             }];
         } else {
-            // 如果没找到直连，尝试用 WebView 打开
-            // Forward 支持 type: "webview" (需要确认内核版本支持)
-            // 或者返回一个提示
             return [{ 
                 id: "err", 
                 type: "text", 
-                title: "未找到直连", 
-                subTitle: "该视频可能使用了第三方播放器，无法直接解析" 
+                title: "暂无直连源", 
+                subTitle: "未找到 m3u8 直连，可能是第三方网盘源" 
             }];
         }
 
     } catch (e) {
-        return [{ id: "err", type: "text", title: "解析错误" }];
+        return [{ id: "err", type: "text", title: "解析错误", subTitle: e.message }];
     }
 }
