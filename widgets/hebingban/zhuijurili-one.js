@@ -1,8 +1,8 @@
 WidgetMetadata = {
     id: "global_tv_calendar_ultimate",
     title: "全球追剧时刻表",
-    author: "MakkaPakka",
-    description: "聚合全球剧集更新与综艺排期。支持国家筛选。",
+    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+    description: "聚合全球剧集更新与综艺排期，支持国家筛选。",
     version: "2.0.5",
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
