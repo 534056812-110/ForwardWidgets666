@@ -7,21 +7,14 @@ WidgetMetadata = {
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
 
-    // 1. 全局参数
-    globalParams: [
-        {
-            name: "apiKey",
-            title: "TMDB API Key (必填)",
-            type: "input",
-            description: "用于获取数据。",
-            value: ""
-        }
-    ],
+    // 0. 移除 apiKey，无需任何配置
+    globalParams: [],
+
     modules: [
         {
             title: "探索流派",
             functionName: "loadNicheGenre",
-            type: "list", // 推荐使用 list
+            type: "list",
             cacheDuration: 3600,
             params: [
                 {
@@ -71,7 +64,7 @@ WidgetMetadata = {
     ]
 };
 
-// TMDB 全量类型映射 (电影+剧集)
+// TMDB 全量类型映射
 const GENRE_MAP = {
     28: "动作", 12: "冒险", 16: "动画", 35: "喜剧", 80: "犯罪", 99: "纪录片",
     18: "剧情", 10751: "家庭", 14: "奇幻", 36: "历史", 27: "恐怖", 10402: "音乐",
@@ -81,29 +74,38 @@ const GENRE_MAP = {
 };
 
 async function loadNicheGenre(params = {}) {
-    const { apiKey, themeId, mediaType = "movie", sort = "popularity.desc" } = params;
+    const { themeId, mediaType = "movie", sort = "popularity.desc" } = params;
 
-    if (!apiKey) {
-        return [{ id: "err_key", type: "text", title: "配置缺失", subTitle: "请在全局设置中填入 Key" }];
-    }
-
-    let url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${apiKey}&language=zh-CN&sort_by=${sort}&include_adult=false&include_video=false&page=1&with_keywords=${themeId}&vote_count.gte=50`;
+    // 构造请求参数
+    const queryParams = {
+        language: "zh-CN",
+        sort_by: sort,
+        include_adult: false,
+        include_video: false,
+        page: 1,
+        with_keywords: themeId,
+        "vote_count.gte": 50 // 基础过滤
+    };
 
     if (sort === "vote_average.desc") {
-        url += "&vote_count.gte=300";
+        queryParams["vote_count.gte"] = 300; // 高分榜门槛提高
     }
 
-    console.log(`[Niche] Fetching: ${mediaType} - keywords:${themeId}`);
+    // 修正排序字段兼容性
+    if (mediaType === "tv" && sort.includes("primary_release_date")) {
+        queryParams.sort_by = "first_air_date.desc";
+    }
 
     try {
-        const res = await Widget.http.get(url);
-        const data = res.data || res;
+        // 使用 Widget.tmdb.get 免 Key 请求
+        const res = await Widget.tmdb.get(`/discover/${mediaType}`, { params: queryParams });
+        const data = res || {};
         
         if (!data.results || data.results.length === 0) {
             return [{ id: "empty", type: "text", title: "暂无数据", subTitle: "该分类下暂无内容" }];
         }
 
-        // 2. 映射数据
+        // 映射数据
         return data.results.map(item => {
             const title = item.title || item.name;
             const originalName = item.original_title || item.original_name;
@@ -125,7 +127,7 @@ async function loadNicheGenre(params = {}) {
                 
                 title: title,
                 
-                // 【核心增强】年份 • 类型
+                // 【核心 UI】年份 • 类型
                 genreTitle: [year, genreNames].filter(Boolean).join(" • "),
                 
                 // 副标题：评分
