@@ -1,9 +1,9 @@
 WidgetMetadata = {
     id: "western_trends_hub",
     title: "欧美风向标|口碑与热度",
-    author: "MakkaPakka",
+    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "聚合烂番茄(口碑)与流媒体平台(热度)，一站式掌握欧美影视动态。",
-    version: "1.0.0",
+    version: "1.0.1",
     requiredVersion: "0.0.1",
     site: "https://www.rottentomatoes.com",
 
