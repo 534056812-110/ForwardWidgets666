@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.danmu.pro.online_dict",
   title: "多源弹幕",
-  version: "1.0.7",
+  version: "1.0.8",
   requiredVersion: "0.0.2",
   description: "支持添加多条api并自命名&繁简互转",
   author: "MakkaPakka",
