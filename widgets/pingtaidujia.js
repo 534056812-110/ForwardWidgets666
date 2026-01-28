@@ -2,7 +2,7 @@ WidgetMetadata = {
   id: "platform.originals.ui.fix",
   title: "流媒体·独家原创",
   author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-  description: "Netflix/HBO/腾讯/B站…自制内容",
+  description: "发现Netflix/HBO/腾讯/B站等平台自制内容",
   version: "1.0.4",
   requiredVersion: "0.0.1",
   site: "https://www.themoviedb.org",
