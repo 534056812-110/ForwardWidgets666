@@ -1,8 +1,8 @@
 WidgetMetadata = {
     id: "cinephile_hub_ultimate",
     title: "影迷宝藏 | 系列与流派",
-    author: "MakkaPakka",
-    description: "聚合【系列电影大满贯】与【趣味流派设定】。一键补番，探索未知。",
+    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+    description: "聚合【系列电影大满贯】与【趣味流派探索】，一键补番，探索未知。",
     version: "1.0.3",
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
@@ -71,7 +71,7 @@ WidgetMetadata = {
         // 模块 2: 设定控 (特殊流派)
         // ===========================================
         {
-            title: "趣味流派设定",
+            title: "趣味流派探索",
             functionName: "loadNicheGenre",
             type: "list",
             cacheDuration: 3600,
