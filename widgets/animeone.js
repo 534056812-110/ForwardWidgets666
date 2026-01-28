@@ -1,47 +1,38 @@
 WidgetMetadata = {
-    id: "anime_omni_hub",
-    title: "二次元全境聚合",
+    id: "anime_omni_pro",
+    title: "二次元全境聚合 (Pro)",
     author: "MakkaPakka",
-    description: "聚合 MyAnimeList(全球)、Bangumi(国内硬核)、Bilibili(热播) 三大榜单。",
-    version: "1.0.0",
+    description: "聚合 MyAnimeList(全球)、Bangumi(硬核)、Bilibili(热播)。支持免Key、无限加载。",
+    version: "2.0.0",
     requiredVersion: "0.0.1",
     site: "https://myanimelist.net",
-
-    // 全局参数
-    globalParams: [
-        {
-            name: "apiKey",
-            title: "TMDB API Key (必填)",
-            type: "input",
-            description: "用于匹配高清海报和背景。",
-            value: ""
-        }
-    ],
 
     modules: [
         {
             title: "动漫热榜",
             functionName: "loadAnimeHub",
             type: "video",
-            cacheDuration: 7200, // 2小时缓存
+            cacheDuration: 3600,
             params: [
                 {
                     name: "source",
                     title: "选择榜单",
                     type: "enumeration",
-                    value: "mal_top",
+                    value: "bili_hot",
                     enumOptions: [
-                        // --- MyAnimeList (全球) ---
+                        { title: "📺 B站 - 番剧热播 (日漫)", value: "bili_hot" },
+                        { title: "📺 B站 - 国创热播 (国漫)", value: "bili_cn" },
                         { title: "🌍 MAL - 历史 Top 100", value: "mal_top" },
                         { title: "🌍 MAL - 当前热播 (Airing)", value: "mal_airing" },
                         { title: "🌍 MAL - 即将上映 (Upcoming)", value: "mal_upcoming" },
                         { title: "🌍 MAL - 人气最高 (Popularity)", value: "mal_bypopularity" },
-                        // --- Bangumi (国内硬核) ---
-                        { title: "🌸 Bangumi - 每日放送", value: "bgm_calendar" },
-                        // --- Bilibili (国内大众) ---
-                        { title: "📺 B站 - 番剧热播", value: "bili_hot" },
-                        { title: "📺 B站 - 国创热播", value: "bili_cn" }
+                        { title: "🌸 Bangumi - 每日放送", value: "bgm_calendar" } // Bangumi API 不支持分页，仅展示当天
                     ]
+                },
+                {
+                    name: "page",
+                    title: "页码",
+                    type: "page"
                 }
             ]
         }
@@ -49,80 +40,112 @@ WidgetMetadata = {
 };
 
 async function loadAnimeHub(params = {}) {
-    const { apiKey, source } = params;
-    if (!apiKey) return [{ id: "err", type: "text", title: "请填写 TMDB API Key" }];
-
-    // === 1. MyAnimeList (Jikan API) ===
-    if (source.startsWith("mal_")) {
-        const type = source.replace("mal_", ""); // top, airing, upcoming...
-        return await fetchMalData(type, apiKey);
-    }
-
-    // === 2. Bangumi ===
-    if (source.startsWith("bgm_")) {
-        return await fetchBangumiCalendar(apiKey);
-    }
-
-    // === 3. Bilibili ===
+    const { source, page = 1 } = params;
+    
+    // === 1. Bilibili (支持分页) ===
     if (source.startsWith("bili_")) {
         const type = source === "bili_cn" ? 4 : 1; // 4=国创, 1=番剧
-        return await fetchBilibiliRank(type, apiKey);
+        return await fetchBilibiliRank(type, page);
+    }
+
+    // === 2. MyAnimeList (支持分页) ===
+    if (source.startsWith("mal_")) {
+        const type = source.replace("mal_", "");
+        return await fetchMalData(type, page);
+    }
+
+    // === 3. Bangumi (每日放送无分页概念) ===
+    if (source.startsWith("bgm_")) {
+        // 仅第一页加载，后面返回空防止重复
+        if (page > 1) return [];
+        return await fetchBangumiCalendar();
     }
 }
 
 // ==========================================
-// 逻辑 A: MyAnimeList (via Jikan API)
+// 逻辑 A: Bilibili (Web API)
 // ==========================================
 
-async function fetchMalData(filterType, apiKey) {
-    // Jikan API: https://api.jikan.moe/v4/top/anime?filter=...
-    let url = "https://api.jikan.moe/v4/top/anime";
+async function fetchBilibiliRank(type, page) {
+    // B站 Web 接口并没有很好的分页支持，通常一次返回前 100。
+    // 为了模拟分页效果，我们一次拉取数据，然后在本地做切片。
+    // 或者使用 Index 索引接口 (api.bilibili.com/pgc/season/index/result) 支持分页
     
-    // 映射 filter 参数
-    // MAL API 默认为 top (rank)
-    if (filterType === "airing") url += "?filter=airing";
-    else if (filterType === "upcoming") url += "?filter=upcoming";
-    else if (filterType === "bypopularity") url += "?filter=bypopularity";
-    
-    console.log(`[MAL] Fetching: ${url}`);
+    // 这里我们用 Index 接口来实现真正的分页加载
+    // season_type: 1=番剧, 4=国创
+    // order: 2=播放量, 3=追番数, 5=更新时间
+    // 这里用 order=2 (热度)
+    const url = `https://api.bilibili.com/pgc/season/index/result?season_type=${type}&order=2&page=${page}&pagesize=20`;
 
     try {
         const res = await Widget.http.get(url);
         const data = res.data || {};
-        const list = data.data || [];
+        const list = data.data?.list || [];
 
-        if (list.length === 0) return [{ id: "empty", type: "text", title: "MAL 无数据" }];
+        if (list.length === 0) return [];
 
-        // 并发匹配 TMDB (MAL 标题通常是罗马音或英文，需匹配)
-        const promises = list.slice(0, 15).map(async (item, index) => {
+        const promises = list.map(async (item) => {
+            let finalItem = {
+                id: `bili_${item.season_id}`,
+                type: "tmdb", 
+                mediaType: "tv",
+                title: item.title,
+                subTitle: item.index_show || `播放: ${item.order}`,
+                posterPath: item.cover,
+                year: (item.order_type || "").substring(0, 4) // B站有时候在这里放年份
+            };
+
+            // 尝试匹配 TMDB (免Key)
+            const tmdbItem = await searchTmdbInternal(item.title);
+            if (tmdbItem) mergeTmdb(finalItem, tmdbItem);
+            
+            return finalItem;
+        });
+
+        return await Promise.all(promises);
+
+    } catch (e) {
+        return [{ id: "err", type: "text", title: "B站加载失败", subTitle: e.message }];
+    }
+}
+
+// ==========================================
+// 逻辑 B: MyAnimeList (Jikan API)
+// ==========================================
+
+async function fetchMalData(filterType, page) {
+    let url = `https://api.jikan.moe/v4/top/anime?page=${page}`;
+    
+    if (filterType === "airing") url += "&filter=airing";
+    else if (filterType === "upcoming") url += "&filter=upcoming";
+    else if (filterType === "bypopularity") url += "&filter=bypopularity";
+    
+    try {
+        const res = await Widget.http.get(url);
+        const list = (res.data || {}).data || [];
+
+        if (list.length === 0) return [];
+
+        const promises = list.map(async (item, index) => {
+            const rank = (page - 1) * 25 + index + 1;
             const titleEn = item.title_english || item.title;
             const titleJp = item.title_japanese;
             
-            // 构造默认项
             let finalItem = {
                 id: `mal_${item.mal_id}`,
-                type: "tmdb", 
+                type: "tmdb",
                 mediaType: "tv",
-                title: `${index + 1}. ${titleEn}`, // 默认显示英文名
-                subTitle: `MAL ★${item.score || "N/A"} | 👥 ${item.members}`,
-                posterPath: item.images?.jpg?.large_image_url || "",
-                year: item.year ? String(item.year) : "",
+                title: `${rank}. ${titleEn}`,
+                subTitle: `⭐ ${item.score} | ${item.year || ""}`,
+                posterPath: item.images?.jpg?.large_image_url,
                 description: item.synopsis
             };
 
-            // 去 TMDB 找中文资料
-            // 优先搜英文名，其次日文名
-            const tmdbItem = await searchTmdbBestMatch(titleEn, titleJp, apiKey);
-            
+            // TMDB 匹配 (优先中文)
+            const tmdbItem = await searchTmdbBestMatch(titleEn, titleJp);
             if (tmdbItem) {
-                finalItem.id = String(tmdbItem.id);
-                finalItem.tmdbId = tmdbItem.id;
-                finalItem.title = `${index + 1}. ${tmdbItem.name || tmdbItem.title}`; // 换成中文名
-                finalItem.posterPath = tmdbItem.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbItem.poster_path}` : finalItem.posterPath;
-                finalItem.backdropPath = tmdbItem.backdrop_path ? `https://image.tmdb.org/t/p/w780${tmdbItem.backdrop_path}` : "";
-                finalItem.rating = tmdbItem.vote_average.toFixed(1);
-                // 简介保留 MAL 的还是用 TMDB 的？TMDB 中文简介更好
-                if (tmdbItem.overview) finalItem.description = tmdbItem.overview;
+                mergeTmdb(finalItem, tmdbItem);
+                finalItem.title = `${rank}. ${tmdbItem.name || tmdbItem.title}`; // 替换为中文名
             }
             return finalItem;
         });
@@ -130,15 +153,15 @@ async function fetchMalData(filterType, apiKey) {
         return await Promise.all(promises);
 
     } catch (e) {
-        return [{ id: "err_mal", type: "text", title: "MAL 连接失败", subTitle: e.message }];
+        return [{ id: "err", type: "text", title: "MAL 加载失败" }];
     }
 }
 
 // ==========================================
-// 逻辑 B: Bangumi & Bilibili (复用之前逻辑)
+// 逻辑 C: Bangumi (每日放送)
 // ==========================================
 
-async function fetchBangumiCalendar(apiKey) {
+async function fetchBangumiCalendar() {
     try {
         const res = await Widget.http.get("https://api.bgm.tv/calendar");
         const data = res.data || [];
@@ -154,26 +177,8 @@ async function fetchBangumiCalendar(apiKey) {
                 id: `bgm_${item.id}`, type: "tmdb", mediaType: "tv",
                 title: name, subTitle: item.name, posterPath: item.images?.large
             };
-            const tmdb = await searchTmdbBestMatch(name, item.name, apiKey);
-            if (tmdb) mergeTmdb(finalItem, tmdb);
-            return finalItem;
-        });
-        return await Promise.all(promises);
-    } catch (e) { return [{ id: "err_bgm", type: "text", title: "Bangumi 错误" }]; }
-}
-
-async function fetchBilibiliRank(type, apiKey) {
-    try {
-        const res = await Widget.http.get(`https://api.bilibili.com/pgc/web/rank/list?day=3&season_type=${type}`);
-        const list = (res.data?.result?.list || res.data?.data?.list || []).slice(0, 15);
-        
-        const promises = list.map(async (item, i) => {
-            let finalItem = {
-                id: `bili_${i}`, type: "tmdb", mediaType: "tv",
-                title: `${i+1}. ${item.title}`, subTitle: item.new_ep?.index_show, posterPath: item.cover
-            };
-            const tmdb = await searchTmdbBestMatch(item.title, "", apiKey);
-            if (tmdb) mergeTmdb(finalItem, tmdb);
+            const tmdbItem = await searchTmdbBestMatch(name, item.name);
+            if (tmdbItem) mergeTmdb(finalItem, tmdbItem);
             return finalItem;
         });
         return await Promise.all(promises);
@@ -181,35 +186,43 @@ async function fetchBilibiliRank(type, apiKey) {
 }
 
 // ==========================================
-// 核心工具: 智能匹配
+// 核心工具: 免 Key TMDB 搜索
 // ==========================================
 
-async function searchTmdbBestMatch(query1, query2, apiKey) {
-    // 策略：先搜 Query1 (通常是英/中文)，如果没有结果，搜 Query2 (通常是原名)
-    let res = await searchTmdb(query1, apiKey);
-    if (!res && query2) {
-        res = await searchTmdb(query2, apiKey);
-    }
-    return res;
-}
-
-async function searchTmdb(query, apiKey) {
+// 使用 Forward 内置的 Widget.tmdb 接口 (无需 Key)
+async function searchTmdbInternal(query) {
     if (!query) return null;
     const cleanQuery = query.replace(/第[一二三四五六七八九十\d]+[季章]/g, "").trim();
-    const url = `https://api.themoviedb.org/3/search/tv?api_key=${apiKey}&query=${encodeURIComponent(cleanQuery)}&language=zh-CN&page=1`;
+    
     try {
-        const res = await Widget.http.get(url);
-        return (res.data?.results || [])[0];
+        // 直接调用 search/tv，不带 api_key 参数
+        const res = await Widget.tmdb.get("/search/tv", {
+            params: {
+                query: cleanQuery,
+                language: "zh-CN",
+                page: 1
+            }
+        });
+        return (res.results || [])[0];
     } catch (e) { return null; }
+}
+
+async function searchTmdbBestMatch(query1, query2) {
+    let res = await searchTmdbInternal(query1);
+    if (!res && query2) {
+        res = await searchTmdbInternal(query2);
+    }
+    return res;
 }
 
 function mergeTmdb(target, source) {
     target.id = String(source.id);
     target.tmdbId = source.id;
-    target.posterPath = source.poster_path ? `https://image.tmdb.org/t/p/w500${source.poster_path}` : target.posterPath;
-    target.backdropPath = source.backdrop_path ? `https://image.tmdb.org/t/p/w780${source.backdrop_path}` : "";
-    target.year = (source.first_air_date || source.release_date || "").substring(0, 4);
-    target.description = source.overview;
-    target.rating = source.vote_average.toFixed(1);
-    target.title = source.name || source.title || target.title; // 替换为标准中文名
+    // 使用 TMDB 的高清图
+    if (source.poster_path) target.posterPath = `https://image.tmdb.org/t/p/w500${source.poster_path}`;
+    if (source.backdrop_path) target.backdropPath = `https://image.tmdb.org/t/p/w780${source.backdrop_path}`;
+    
+    target.rating = source.vote_average ? source.vote_average.toFixed(1) : target.rating;
+    target.year = (source.first_air_date || "").substring(0, 4);
+    if (source.overview) target.description = source.overview;
 }
