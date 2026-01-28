@@ -1,11 +1,11 @@
 WidgetMetadata = {
-    id: "missav_fix_final",
-    title: "MissAV (强力修复版)",
+    id: "missav_ultimate",
+    title: "MissAV (终极版)",
     author: "MakkaPakka",
-    description: "针对 Cloudflare 反爬优化，支持 m3u8 直连解析。",
-    version: "1.1.0",
+    description: "完美复刻官方逻辑，支持无码/热门/搜索，强力反爬。",
+    version: "2.0.0",
     requiredVersion: "0.0.1",
-    site: "https://missav.com",
+    site: "https://missav.ai",
 
     modules: [
         {
@@ -20,87 +20,100 @@ WidgetMetadata = {
                     type: "enumeration", 
                     value: "new",
                     enumOptions: [
-                        { title: "🆕 最新发布", value: "new" },
-                        { title: "🔥 发行商热门", value: "dm" }, // 很多热门内容在这里
-                        { title: "🔞 无码流出", value: "uncensored-leak" },
-                        { title: "🇯🇵 东京热", value: "tokyo-hot" },
-                        { title: "🇨🇳 中文字幕", value: "chinese-subtitle" }
+                        { title: "🆕 最新发布", value: "dm588/cn/release" },
+                        { title: "🔥 本周热门", value: "dm169/cn/weekly-hot" },
+                        { title: "🌟 月度热门", value: "dm257/cn/monthly-hot" },
+                        { title: "🔞 无码流出", value: "dm621/cn/uncensored-leak" },
+                        { title: "🇯🇵 东京热", value: "dm29/cn/tokyohot" },
+                        { title: "🇨🇳 中文字幕", value: "dm265/cn/chinese-subtitle" }
                     ] 
+                },
+                {
+                    name: "sort",
+                    title: "排序",
+                    type: "enumeration",
+                    value: "released_at",
+                    enumOptions: [
+                        { title: "发布日期", value: "released_at" },
+                        { title: "今日浏览", value: "today_views" },
+                        { title: "总浏览量", value: "views" },
+                        { title: "收藏数", value: "saved" }
+                    ]
                 }
             ]
         }
     ]
 };
 
-const BASE_URL = "https://missav.com";
-// 使用更真实的 iPhone UA
-const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1";
+// 核心配置：完全复刻成功代码的 Headers
+const BASE_URL = "https://missav.ai";
+const HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+    "DNT": "1",
+    "Referer": "https://missav.ai/",
+    "Connection": "keep-alive"
+};
 
+// ==========================================
+// 1. 列表加载
+// ==========================================
 async function loadList(params = {}) {
-    const { page = 1, category = "new" } = params;
+    const { page = 1, category = "dm588/cn/release", sort = "released_at" } = params;
     
-    // 构造 URL
-    let url = `${BASE_URL}/${category}`;
-    if (page > 1) {
-        url += `?page=${page}`;
-    }
-
-    console.log(`[MissAV] Fetching: ${url}`);
+    // 构造 URL: https://missav.ai/dm588/cn/release?sort=released_at&page=1
+    let url = `${BASE_URL}/${category}?sort=${sort}`;
+    if (page > 1) url += `&page=${page}`;
 
     try {
-        const res = await Widget.http.get(url, {
-            headers: { 
-                "User-Agent": UA,
-                "Referer": BASE_URL + "/",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-            }
-        });
-        
+        const res = await Widget.http.get(url, { headers: HEADERS });
         const html = res.data;
-        // 简单检查是否被 CF 拦截 (如果 HTML 包含 "Just a moment" 或 "Cloudflare")
-        if (!html || html.includes("Cloudflare") || html.includes("Just a moment")) {
-            return [{ id: "err_cf", type: "text", title: "被 Cloudflare 拦截", subTitle: "请稍后重试或切换网络" }];
+        
+        // 简单风控检查
+        if (!html || html.length < 5000 || html.includes("Just a moment")) {
+            return [{ id: "err_cf", type: "text", title: "访问受限", subTitle: "Cloudflare 正在验证，请稍后重试" }];
         }
 
         const $ = Widget.html.load(html);
         const results = [];
 
-        // 适配 MissAV 的 Grid 布局
-        // 查找所有包含封面的容器
         $("div.group").each((i, el) => {
             const $el = $(el);
             const $link = $el.find("a.text-secondary");
-            
-            // 尝试获取链接，MissAV 有时链接在图片上
-            const href = $link.attr("href") || $el.find("a").attr("href");
+            const href = $link.attr("href");
             
             if (href) {
-                const title = $link.text().trim() || $el.find("img").attr("alt");
+                const title = $link.text().trim();
                 const $img = $el.find("img");
-                // 优先获取 data-src (懒加载)，其次 src
-                const img = $img.attr("data-src") || $img.attr("src");
+                const imgSrc = $img.attr("data-src") || $img.attr("src");
                 const duration = $el.find(".absolute.bottom-1.right-1").text().trim();
 
-                if (title && img) {
-                    results.push({
-                        id: href,
-                        type: "link", // 点击触发 loadDetail
-                        title: title,
-                        coverUrl: img,
-                        link: href,
-                        description: duration,
-                        customHeaders: {
-                            "Referer": BASE_URL,
-                            "User-Agent": UA
-                        }
-                    });
-                }
+                // 提取 ID 用于拼接高清封面
+                // href: https://missav.ai/cn/fc2-ppv-4250288
+                const videoId = href.split('/').pop().replace(/-uncensored-leak|-chinese-subtitle/g, '').toUpperCase();
+                const coverUrl = `https://fourhoi.com/${videoId.toLowerCase()}/cover-t.jpg`;
+
+                results.push({
+                    id: href,
+                    type: "link", // 触发详情
+                    title: title,
+                    // 优先用拼接的高清封面，如果没有则用网页抓取的
+                    coverUrl: coverUrl || imgSrc, 
+                    link: href,
+                    description: `时长: ${duration} | 番号: ${videoId}`,
+                    customHeaders: HEADERS // 传递 headers
+                });
             }
         });
-
-        if (results.length === 0) {
-            return [{ id: "empty", type: "text", title: "解析为空", subTitle: "网站结构可能已变更" }];
-        }
 
         return results;
     } catch (e) {
@@ -108,59 +121,51 @@ async function loadList(params = {}) {
     }
 }
 
+// ==========================================
+// 2. 详情与播放解析
+// ==========================================
 async function loadDetail(link) {
     try {
-        const res = await Widget.http.get(link, {
-            headers: { 
-                "User-Agent": UA,
-                "Referer": BASE_URL // 必须带 Referer
-            }
-        });
+        const res = await Widget.http.get(link, { headers: HEADERS });
         const html = res.data;
-
-        // --- 核心：暴力提取 m3u8 ---
-        let m3u8Url = "";
-
-        // 1. 尝试匹配 playlist.m3u8 这种标准格式
-        // MissAV 的 m3u8 通常包含在 script 标签的 source 变量里，或者直接是 https url
-        // 正则解释：匹配 https 开头，中间不含引号，以 .m3u8 结尾，可能后面带参数
-        const regex = /['"](https:\/\/[^'"]+?\.m3u8[^'"]*)['"]/;
-        const match = html.match(regex);
-        
-        if (match && match[1]) {
-            m3u8Url = match[1];
-        } else {
-            // 2. 尝试匹配 source = '...' 格式
-            const match2 = html.match(/source\s*=\s*['"]([^'"]+)['"]/);
-            if (match2 && match2[1] && match2[1].includes("m3u8")) {
-                m3u8Url = match2[1];
-            }
-        }
-
-        // 解析失败
-        if (!m3u8Url) {
-            return [{ id: "err_parse", type: "text", title: "无法解析视频地址", subTitle: "可能需要登录或使用了非 m3u8 播放器" }];
-        }
-
-        // 提取标题
         const $ = Widget.html.load(html);
-        const title = $("h1").text().trim() || "MissAV Video";
+        const title = $("h1.text-base").text().trim();
+
+        // --- 核心：播放地址提取 (复刻成功代码) ---
+        let videoUrl = "";
+        
+        // 1. 查找 surrit.com 的 m3u8
+        const scriptContent = $("script").text() || "";
+        // 匹配 UUID 模式: 8-4-4-4-12 位十六进制
+        const uuidMatch = html.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/);
+        
+        if (uuidMatch) {
+            // MissAV 的 m3u8 规则通常是 https://surrit.com/{uuid}/playlist.m3u8
+            // 这是一个非常重要的发现！
+            videoUrl = `https://surrit.com/${uuidMatch[0]}/playlist.m3u8`;
+        } else {
+            // 2. 备用正则匹配
+            const m3u8Match = html.match(/https:\/\/[^"']+\.m3u8/);
+            if (m3u8Match) videoUrl = m3u8Match[0];
+        }
+
+        if (!videoUrl) {
+            return [{ id: "err", type: "text", title: "解析失败", subTitle: "未找到播放地址" }];
+        }
 
         return [{
             id: link,
             type: "video",
             title: title,
-            videoUrl: m3u8Url,
+            videoUrl: videoUrl,
             playerType: "system",
-            // 关键：播放时必须带 Referer，否则 403
             customHeaders: {
-                "Referer": link, // 指向详情页 URL
-                "User-Agent": UA,
-                "Origin": BASE_URL
+                "Referer": link, // 播放时必须带详情页作为 Referer
+                "User-Agent": HEADERS["User-Agent"]
             }
         }];
 
     } catch (e) {
-        return [{ id: "err", type: "text", title: "详情页请求错误", subTitle: e.message }];
+        return [{ id: "err", type: "text", title: "请求错误", subTitle: e.message }];
     }
 }
