@@ -1,9 +1,9 @@
 WidgetMetadata = {
-    id: "trakt_personal_future_fix",
-    title: "Trakt 个人中心 (未来时间轴)",
+    id: "trakt_personal_full_v5",
+    title: "Trakt 个人中心 (全功能)",
     author: "MakkaPakka",
-    description: "追剧日历优化：优先展示【今天及未来】的更新，按时间正序排列。",
-    version: "4.4.0",
+    description: "支持【未来时间轴】、【更新倒序】、【观看倒序】三种追剧模式。",
+    version: "5.0.0",
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
@@ -25,7 +25,7 @@ WidgetMetadata = {
                     type: "enumeration",
                     value: "updates",
                     enumOptions: [
-                        { title: "📅 追剧日历 (未来优先)", value: "updates" },
+                        { title: "📅 追剧日历", value: "updates" },
                         { title: "📜 待看列表", value: "watchlist" },
                         { title: "📦 收藏列表", value: "collection" },
                         { title: "🕒 观看历史", value: "history" }
@@ -39,7 +39,7 @@ WidgetMetadata = {
                     belongTo: { paramName: "section", value: ["watchlist", "collection", "history"] },
                     enumOptions: [ { title: "全部", value: "all" }, { title: "剧集", value: "shows" }, { title: "电影", value: "movies" } ]
                 },
-                // 追剧日历专用排序
+                // 追剧日历专用排序 (3个选项)
                 {
                     name: "updateSort",
                     title: "追剧模式",
@@ -47,8 +47,9 @@ WidgetMetadata = {
                     value: "future_first",
                     belongTo: { paramName: "section", value: ["updates"] },
                     enumOptions: [
-                        { title: "从今天往后 (未来优先)", value: "future_first" },
-                        { title: "按更新倒序 (最近更新)", value: "air_date_desc" }
+                        { title: "🔜 从今天往后", value: "future_first" },
+                        { title: "🔄 按更新倒序", value: "air_date_desc" },
+                        { title: "👁️ 按观看倒序", value: "watched_at" } // 补回来的
                     ]
                 },
                 { name: "page", title: "页码", type: "page" }
@@ -67,8 +68,7 @@ async function loadTraktProfile(params = {}) {
         return await loadUpdatesLogic(traktUser, traktClientId, updateSort, page);
     }
 
-    // === B. 常规列表 (Watchlist/History...) ===
-    // (这部分逻辑保持不变，为了节省篇幅，直接复用之前的逻辑)
+    // === B. 常规列表 ===
     let rawItems = [];
     const sortType = "added,desc";
     if (type === "all") {
@@ -111,13 +111,9 @@ async function loadUpdatesLogic(user, id, sort, page) {
             const tmdb = await fetchTmdbShowDetails(item.show.ids.tmdb);
             if (!tmdb) return null;
             
-            // 核心时间判断
             const nextAir = tmdb.next_episode_to_air?.air_date;
             const lastAir = tmdb.last_episode_to_air?.air_date;
-            
-            // 如果有下一集，用下一集时间；否则用上一集时间
             const sortDate = nextAir || lastAir || "1970-01-01";
-            // 标记是否为未来/今天
             const today = new Date().toISOString().split('T')[0];
             const isFuture = sortDate >= today;
 
@@ -125,7 +121,7 @@ async function loadUpdatesLogic(user, id, sort, page) {
                 trakt: item, tmdb: tmdb,
                 sortDate: sortDate,
                 isFuture: isFuture,
-                status: tmdb.status
+                watchedDate: item.last_watched_at // 用于 watched_at 排序
             };
         }));
 
@@ -133,24 +129,18 @@ async function loadUpdatesLogic(user, id, sort, page) {
         
         // --- 排序逻辑 ---
         if (sort === "future_first") {
-            // 1. 分组：未来(含今天) vs 过去
-            const futureShows = valid.filter(s => s.isFuture && s.tmdb.next_episode_to_air); // 必须真的有next episode
+            const futureShows = valid.filter(s => s.isFuture && s.tmdb.next_episode_to_air);
             const pastShows = valid.filter(s => !s.isFuture || !s.tmdb.next_episode_to_air);
-            
-            // 2. 排序
-            // 未来：按时间正序 (今天 -> 明天 -> 后天)
-            futureShows.sort((a, b) => new Date(a.sortDate) - new Date(b.sortDate));
-            // 过去：按时间倒序 (昨天 -> 前天 -> 大前天) [作为补充展示]
-            pastShows.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
-            
-            // 3. 合并：未来在前，过去在后
-            // 实际上用户只想看“日历”，所以把未来的排完就行了，或者把刚播完的放后面
-            // 这里我们把 future 放前面
-            valid.length = 0; // 清空引用
+            futureShows.sort((a, b) => new Date(a.sortDate) - new Date(b.sortDate)); // 正序
+            pastShows.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));   // 倒序
+            valid.length = 0; 
             valid.push(...futureShows, ...pastShows);
-        } else {
-            // 纯倒序 (旧版逻辑)
+        } else if (sort === "air_date_desc") {
+            // 更新时间倒序
             valid.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
+        } else {
+            // 观看时间倒序 (默认 & 补回)
+            valid.sort((a, b) => new Date(b.watchedDate) - new Date(a.watchedDate));
         }
 
         const start = (page - 1) * 15;
@@ -159,24 +149,28 @@ async function loadUpdatesLogic(user, id, sort, page) {
             let dateLabel = "暂无排期", epInfo = "已完结";
             
             if (d.next_episode_to_air) {
-                dateLabel = `🔜 ${d.next_episode_to_air.air_date}`; // 重点展示
+                dateLabel = `🔜 ${d.next_episode_to_air.air_date}`; 
                 epInfo = `S${d.next_episode_to_air.season_number}E${d.next_episode_to_air.episode_number}`;
             } else if (d.last_episode_to_air) {
                 dateLabel = `📅 ${d.last_episode_to_air.air_date}`;
                 epInfo = `S${d.last_episode_to_air.season_number}E${d.last_episode_to_air.episode_number}`;
             }
             
+            // 如果是按观看时间排序，可以在副标题提示观看时间
+            if (sort === "watched_at") {
+                dateLabel = `👁️ ${item.watchedDate.split('T')[0]}`;
+            }
+            
             return {
                 id: String(d.id), tmdbId: d.id, type: "tmdb", mediaType: "tv",
                 title: d.name, genreTitle: dateLabel, subTitle: epInfo,
                 posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : "",
-                description: `上次观看: ${item.trakt.last_watched_at.split("T")[0]}\n${d.overview}`
+                description: `上次观看: ${item.watchedDate.split("T")[0]}\n${d.overview}`
             };
         });
     } catch (e) { return []; }
 }
 
-// 辅助函数 (保持不变)
 async function fetchTraktList(section, type, sort, page, user, id) {
     const limit = 20; 
     const url = `https://api.trakt.tv/users/${user}/${section}/${type}?extended=full&page=${page}&limit=${limit}`;
@@ -191,11 +185,12 @@ async function fetchTraktList(section, type, sort, page, user, id) {
 async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
     try {
         const d = await Widget.tmdb.get(`/${type}/${id}`, { params: { language: "zh-CN" } });
+        const year = (d.first_air_date || d.release_date || "").substring(0, 4);
         return {
             id: String(d.id), tmdbId: d.id, type: "tmdb", mediaType: type,
             title: d.name || d.title || originalTitle,
-            genreTitle: (d.first_air_date || d.release_date || "").substring(0, 4),
-            subTitle: subInfo, posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : ""
+            genreTitle: year, subTitle: subInfo, description: d.overview,
+            posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : ""
         };
     } catch (e) { return null; }
 }
