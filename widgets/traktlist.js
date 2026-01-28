@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "Trakt 个人中心 (修复版)",
     author: "MakkaPakka",
     description: "一站式管理 Trakt 待看、收藏、历史。支持分页和排序优化。",
-    version: "2.1.0",
+    version: "2.2.0",
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
