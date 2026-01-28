@@ -7,15 +7,8 @@ WidgetMetadata = {
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
-    // 1. 全局参数
+    // 1. 全局参数 (仅剩 Trakt)
     globalParams: [
-        {
-            name: "apiKey",
-            title: "TMDB API Key (必填)",
-            type: "input",
-            description: "用于获取推荐数据。",
-            value: ""
-        },
         {
             name: "traktUser",
             title: "Trakt 用户名 (必填)",
@@ -31,21 +24,20 @@ WidgetMetadata = {
             value: ""
         }
     ],
+
     modules: [
         {
             title: "今日惊喜推荐",
             functionName: "loadRandomMix",
-            type: "list", // 推荐使用 list 类型以支持 genreTitle
-            cacheDuration: 43200, 
+            type: "list",
+            cacheDuration: 43200, // 12小时刷新
             params: [] 
         }
     ]
 };
 
-// 默认公共 ID
 const DEFAULT_TRAKT_ID = "003666572e92c4331002a28114387693994e43f5454659f81640a232f08a5996";
 
-// TMDB 类型映射
 const GENRE_MAP = {
     10759: "动作冒险", 16: "动画", 35: "喜剧", 80: "犯罪", 99: "纪录片",
     18: "剧情", 10751: "家庭", 10762: "儿童", 9648: "悬疑", 10763: "新闻",
@@ -54,29 +46,31 @@ const GENRE_MAP = {
 };
 
 async function loadRandomMix(params = {}) {
-    const { apiKey, traktUser } = params;
+    const { traktUser } = params;
     const clientId = params.clientId || DEFAULT_TRAKT_ID;
 
-    if (!apiKey || !traktUser) {
-        return [{ id: "err_missing", type: "text", title: "参数缺失", subTitle: "请在设置中填写 TMDB Key 和 Trakt 用户名" }];
+    if (!traktUser) {
+        return [{ id: "err_missing", type: "text", title: "参数缺失", subTitle: "请在设置中填写 Trakt 用户名" }];
     }
 
+    // 1. 获取 Trakt 历史
     const uniqueShows = await fetchUniqueHistory(traktUser, clientId);
     if (uniqueShows.length === 0) {
         return [{ id: "err_empty", type: "text", title: "暂无记录", subTitle: "Trakt 历史为空或账号私密" }];
     }
 
+    // 2. 随机抽取种子
     const candidatePool = uniqueShows.slice(0, 30);
     console.log(`[Mix] Candidates: ${candidatePool.length}`);
-
     const pickCount = Math.min(candidatePool.length, 5);
     const seeds = getRandomSeeds(candidatePool, pickCount);
-    
     console.log(`[Mix] Seeds: ${seeds.map(s => s.title).join(", ")}`);
 
-    const promiseList = seeds.map(seed => fetchTmdbRecs(seed, apiKey));
+    // 3. 并发获取推荐 (免 Key)
+    const promiseList = seeds.map(seed => fetchTmdbRecs(seed));
     const resultsArray = await Promise.all(promiseList);
 
+    // 4. 混合洗牌
     const mixedList = [];
     let maxRecsLen = 0;
     for (const list of resultsArray) {
@@ -135,24 +129,23 @@ function getRandomSeeds(array, count) {
     return shuffled.slice(0, count);
 }
 
-async function fetchTmdbRecs(seedItem, apiKey) {
-    const url = `https://api.themoviedb.org/3/tv/${seedItem.tmdbId}/recommendations?api_key=${apiKey}&language=zh-CN&page=1`;
-    
+// 使用 Widget.tmdb.get 免 Key 获取推荐
+async function fetchTmdbRecs(seedItem) {
     try {
-        const res = await Widget.http.get(url);
-        const data = res.data || {};
+        const res = await Widget.tmdb.get(`/tv/${seedItem.tmdbId}/recommendations`, {
+            params: { language: "zh-CN", page: 1 }
+        });
         
+        const data = res || {};
         if (!data.results) return [];
 
         return data.results.slice(0, 5).map(item => {
-            // 1. 类型处理
             const genreText = (item.genre_ids || [])
                 .map(id => GENRE_MAP[id])
                 .filter(Boolean)
                 .slice(0, 2)
                 .join(" / ");
             
-            // 2. 年份处理
             const year = (item.first_air_date || "").substring(0, 4);
             const score = item.vote_average ? item.vote_average.toFixed(1) : "0.0";
 
@@ -164,14 +157,14 @@ async function fetchTmdbRecs(seedItem, apiKey) {
                 
                 title: item.name || item.title,
                 
-                // 【核心修改】年份 • 类型
+                // 【UI 核心】年份 • 类型
                 genreTitle: [year, genreText].filter(Boolean).join(" • "),
                 
-                // 副标题：推荐来源 (最重要信息)
+                // 副标题：推荐来源
                 subTitle: `✨ 源于: ${seedItem.title}`,
                 
-                // 简介：评分 + 剧情
-                description: `⭐ ${score} | ${item.overview || "暂无简介"}`,
+                // 简介
+                description: `评分: ${score} | ${item.overview || "暂无简介"}`,
                 
                 posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
                 backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
