@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "二次元全境聚合",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "一站式聚合多平台动漫榜单。",
-    version: "2.1.2",
+    version: "2.2.1",
     requiredVersion: "0.0.1",
     site: "https://bgm.tv",
 
