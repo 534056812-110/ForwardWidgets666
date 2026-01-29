@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "全球追剧时刻表 (双擎版)",
     author: "MakkaPakka",
     description: "聚合全球剧集/综艺。Trakt精准数据 + TMDB智能兜底，内置公用Key。",
-    version: "3.0.1",
+    version: "1.0.2",
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
 
@@ -11,7 +11,7 @@ WidgetMetadata = {
     globalParams: [
         {
             name: "traktClientId",
-            title: " (选填，填写后更新时间更准确)",
+            title: " trakt client id(选填，填写后时间更准)",
             type: "input",
             description: "不填则使用内置公用 ID (推荐)。",
             value: ""
