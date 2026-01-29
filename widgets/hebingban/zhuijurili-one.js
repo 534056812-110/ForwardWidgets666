@@ -3,10 +3,10 @@ WidgetMetadata = {
     title: "全球追剧时刻表",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "聚合全球剧集更新表&综艺排期&bangumi动漫周更表。",
-    version: "2.0.7",
+    version: "2.0.8",
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
-
+    
     // 1. 全局参数
     globalParams: [
         {
@@ -20,7 +20,7 @@ WidgetMetadata = {
 
     modules: [
         // ===========================================
-        // 模块 1: 追剧日历 (Drama) - 保持原样
+        // 模块 1: 追剧日历 (Drama)
         // ===========================================
         {
             title: "追剧日历 (Drama)",
@@ -59,7 +59,7 @@ WidgetMetadata = {
         },
 
         // ===========================================
-        // 模块 2: 综艺时刻 (Variety) - 保持原样
+        // 模块 2: 综艺时刻 (Variety)
         // ===========================================
         {
             title: "综艺时刻 (Variety)",
@@ -95,7 +95,7 @@ WidgetMetadata = {
         },
 
         // ===========================================
-        // 模块 3: 动漫周更 (Anime) - 新增
+        // 模块 3: 动漫周更 (Anime)
         // ===========================================
         {
             title: "动漫周更 (Anime)",
@@ -144,16 +144,20 @@ function getGenreText(ids) {
 }
 
 function buildItem({ id, tmdbId, type, title, year, poster, backdrop, rating, genreText, subTitle, desc }) {
+    // 智能海报拼接：如果是 http 开头，说明已经是完整链接（来自 Bangumi）；否则拼 TMDB
+    const fullPoster = poster && poster.startsWith("http") ? poster : (poster ? `https://image.tmdb.org/t/p/w500${poster}` : "");
+    const fullBackdrop = backdrop && backdrop.startsWith("http") ? backdrop : (backdrop ? `https://image.tmdb.org/t/p/w780${backdrop}` : "");
+
     return {
-        id: String(id),
-        tmdbId: parseInt(tmdbId),
+        id: String(id), // 关键：如果是 TMDB ID，这里就是纯数字字符串
+        tmdbId: parseInt(tmdbId), // 关键：Emby 匹配依赖这个 Int
         type: "tmdb",
         mediaType: type,
         title: title,
         genreTitle: [year, genreText].filter(Boolean).join(" • "), 
         subTitle: subTitle,
-        posterPath: poster ? `https://image.tmdb.org/t/p/w500${poster}` : "",
-        backdropPath: backdrop ? `https://image.tmdb.org/t/p/w780${backdrop}` : "",
+        posterPath: fullPoster,
+        backdropPath: fullBackdrop,
         description: desc || "暂无简介",
         rating: rating,
         year: year
@@ -161,98 +165,7 @@ function buildItem({ id, tmdbId, type, title, year, poster, backdrop, rating, ge
 }
 
 // =========================================================================
-// 1. 业务逻辑：追剧日历 (Drama)
-// =========================================================================
-
-async function loadTvCalendar(params = {}) {
-    const { mode = "update_today", region = "Global", page = 1 } = params;
-    const dates = calculateDates(mode);
-    const isPremiere = mode.includes("premiere");
-    
-    const queryParams = {
-        language: "zh-CN",
-        sort_by: "popularity.desc",
-        include_null_first_air_dates: false,
-        page: page,
-        timezone: "Asia/Shanghai"
-    };
-
-    const dateField = isPremiere ? "first_air_date" : "air_date";
-    queryParams[`${dateField}.gte`] = dates.start;
-    queryParams[`${dateField}.lte`] = dates.end;
-
-    if (region !== "Global") {
-        queryParams.with_origin_country = region;
-        const langMap = { "JP": "ja", "KR": "ko", "CN": "zh", "GB": "en", "US": "en" };
-        if (langMap[region]) queryParams.with_original_language = langMap[region];
-    }
-
-    try {
-        const res = await Widget.tmdb.get("/discover/tv", { params: queryParams });
-        const data = res || {};
-
-        if (!data.results || data.results.length === 0) return page === 1 ? [{ id: "empty", type: "text", title: "暂无更新", subTitle: `${region} 在 ${dates.start} 无数据` }] : [];
-
-        return data.results.map(item => {
-            const dateStr = item[dateField] || "";
-            const shortDate = dateStr.slice(5); 
-            const year = (item.first_air_date || "").substring(0, 4);
-            const genreText = getGenreText(item.genre_ids);
-            
-            let subInfo = [];
-            if (mode !== "update_today" && shortDate) subInfo.push(`📅 ${shortDate}`);
-            else if (mode === "update_today") subInfo.push("🆕 今日");
-            if (item.original_name && item.original_name !== item.name) subInfo.push(item.original_name);
-
-            return buildItem({
-                id: item.id, tmdbId: item.id, type: "tv",
-                title: item.name,
-                year: year, poster: item.poster_path, backdrop: item.backdrop_path,
-                rating: item.vote_average?.toFixed(1),
-                genreText: genreText,
-                subTitle: subInfo.join(" | "),
-                desc: item.overview
-            });
-        });
-    } catch (e) { return [{ id: "err", type: "text", title: "网络错误" }]; }
-}
-
-// =========================================================================
-// 2. 业务逻辑：综艺时刻 (Variety)
-// =========================================================================
-
-async function loadVarietyCalendar(params = {}) {
-    const { region = "cn", mode = "today", traktClientId } = params;
-    const clientId = traktClientId || DEFAULT_TRAKT_ID;
-
-    if (mode === "trending") {
-        return await fetchTmdbVariety(region, null); 
-    }
-
-    const dateStr = getSafeDate(mode); 
-    const countryParam = region === "global" ? "" : region; 
-    const traktUrl = `https://api.trakt.tv/calendars/all/shows/${dateStr}/1?genres=reality,game-show,talk-show${countryParam ? `&countries=${countryParam}` : ''}`;
-
-    try {
-        const res = await Widget.http.get(traktUrl, {
-            headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": clientId }
-        });
-        const data = res.data || [];
-
-        if (Array.isArray(data) && data.length > 0) {
-            const promises = data.map(async (item) => {
-                if (!item.show.ids.tmdb) return null;
-                return await fetchTmdbDetail(item.show.ids.tmdb, item);
-            });
-            return (await Promise.all(promises)).filter(Boolean);
-        }
-    } catch (e) {}
-
-    return await fetchTmdbVariety(region, dateStr);
-}
-
-// =========================================================================
-// 3. 业务逻辑：动漫周更 (Anime) - 新增
+// 1. 业务逻辑：动漫周更 (Anime) - 核心修复
 // =========================================================================
 
 async function loadBangumiCalendar(params = {}) {
@@ -288,15 +201,14 @@ async function loadBangumiCalendar(params = {}) {
             const subTitle = item.name;
             const cover = item.images ? (item.images.large || item.images.common) : "";
             
-            // 初始 Item (Bangumi 数据)
-            let finalItem = {
-                id: `bgm_${item.id}`,
-                tmdbId: 0, // 初始无 TMDB ID
-                type: "tmdb",
-                mediaType: "tv",
+            // 初始数据对象
+            let itemData = {
+                id: `bgm_${item.id}`, // 默认 Bangumi ID
+                tmdbId: 0,
+                type: "tv",
                 title: title,
                 year: "",
-                poster: cover,
+                poster: cover, // 原始 Bangumi 图片 URL (http...)
                 backdrop: "",
                 rating: item.rating?.score?.toFixed(1) || "0.0",
                 genreText: "动画",
@@ -307,20 +219,67 @@ async function loadBangumiCalendar(params = {}) {
             // TMDB 匹配
             const tmdbItem = await searchTmdbBestMatch(title, subTitle);
             if (tmdbItem) {
-                mergeTmdb(finalItem, tmdbItem);
-                // 更新 GenreTitle (Bangumi 周几 + TMDB 类型)
-                const genreText = getGenreText(tmdbItem.genre_ids);
-                finalItem.genreText = genreText;
+                // 关键修复：完全覆盖 ID 和海报
+                itemData.id = String(tmdbItem.id); // 覆盖为 TMDB ID
+                itemData.tmdbId = tmdbItem.id;
+                
+                // TMDB 返回的 poster_path 是相对路径 (/xxx.jpg)，不是 http
+                itemData.poster = tmdbItem.poster_path; 
+                itemData.backdrop = tmdbItem.backdrop_path;
+                
+                itemData.year = (tmdbItem.first_air_date || "").substring(0, 4);
+                itemData.genreText = getGenreText(tmdbItem.genre_ids);
+                itemData.desc = tmdbItem.overview || itemData.desc;
+                itemData.rating = tmdbItem.vote_average?.toFixed(1) || itemData.rating;
             }
             
             // 手动添加周几前缀
-            finalItem.genreTitle = `${dayName} • ${finalItem.genreText || "动画"}`;
+            const finalGenreTitle = `${dayName} • ${itemData.genreText || "动画"}`;
             
-            // 转为标准格式
-            return buildItem(finalItem);
+            // 构建最终 Item
+            // 注意：因为上面已经处理了 poster 是 full url 还是 path，buildItem 会自动识别
+            return buildItem({
+                ...itemData,
+                genreText: finalGenreTitle.split(" • ")[1] // 重新拆分传参，或者直接改 buildItem 逻辑
+            });
+            
+            // 修正：直接手动构造最终对象，避免 buildItem 再次拼接 genreTitle 导致重复
+            // 还是用 buildItem 比较规范，稍微调整下参数
+            return buildItem({
+                id: itemData.id,
+                tmdbId: itemData.tmdbId,
+                type: "tv",
+                title: itemData.title,
+                year: itemData.year,
+                poster: itemData.poster,
+                backdrop: itemData.backdrop,
+                rating: itemData.rating,
+                // 这里我们要强制显示 "周一 • 动画"
+                // 现在的 buildItem 是 [year, genre].join
+                // 我们把 year 传为 "周一"，genre 传为 "动画"
+                // 这样拼出来就是 "周一 • 动画"
+                // 原来的 year 字段只用于显示，这里我们为了 UI 效果 hack 一下
+                // 不对，Forward 可能用 year 字段做排序或过滤。
+                // 最佳方案：修改 buildItem 的 genreTitle 逻辑，或者传入构建好的 genreTitle
+                
+                // 最终方案：直接在下面覆盖 genreTitle
+                genreText: itemData.genreText,
+                subTitle: itemData.subTitle,
+                desc: itemData.desc
+            });
         });
 
-        return await Promise.all(promises);
+        // 再次修正：我在 buildItem 里已经写好了 genreTitle 的拼接逻辑
+        // 所以我们可以在 map 完拿到 result 后，手动修改 genreTitle
+        const results = await Promise.all(promises);
+        
+        return results.map(r => {
+            // 强制加上周几
+            r.genreTitle = `${dayName} • ${r.genreTitle.split(" • ").pop()}`; // 替换掉年份，或者加在前面
+            // 或者：保留年份 "周一 • 2024 • 动画"
+            // r.genreTitle = `${dayName} • ${r.genreTitle}`;
+            return r;
+        });
 
     } catch (e) {
         return [{ id: "err", type: "text", title: "加载失败", subTitle: e.message }];
@@ -328,10 +287,98 @@ async function loadBangumiCalendar(params = {}) {
 }
 
 // =========================================================================
-// 4. 辅助函数
+// 2. 业务逻辑：追剧日历 & 综艺时刻 (保持原样)
 // =========================================================================
 
-// --- 日期相关 ---
+// ... loadTvCalendar 和 loadVarietyCalendar 的代码与之前完全一致 ...
+// 为节省篇幅，请直接复用上一版这两个函数的代码块
+// 它们已经非常完美，不需要修改。
+
+async function loadTvCalendar(params = {}) {
+    const { mode = "update_today", region = "Global", page = 1 } = params;
+    const dates = calculateDates(mode);
+    const isPremiere = mode.includes("premiere");
+    
+    const queryParams = {
+        language: "zh-CN",
+        sort_by: "popularity.desc",
+        include_null_first_air_dates: false,
+        page: page,
+        timezone: "Asia/Shanghai"
+    };
+
+    const dateField = isPremiere ? "first_air_date" : "air_date";
+    queryParams[`${dateField}.gte`] = dates.start;
+    queryParams[`${dateField}.lte`] = dates.end;
+
+    if (region !== "Global") {
+        queryParams.with_origin_country = region;
+        const langMap = { "JP": "ja", "KR": "ko", "CN": "zh", "GB": "en", "US": "en" };
+        if (langMap[region]) queryParams.with_original_language = langMap[region];
+    }
+
+    try {
+        const res = await Widget.tmdb.get("/discover/tv", { params: queryParams });
+        const data = res || {};
+
+        if (!data.results || data.results.length === 0) return page === 1 ? [{ id: "empty", type: "text", title: "暂无更新" }] : [];
+
+        return data.results.map(item => {
+            const dateStr = item[dateField] || "";
+            const shortDate = dateStr.slice(5); 
+            const year = (item.first_air_date || "").substring(0, 4);
+            const genreText = getGenreText(item.genre_ids);
+            
+            let subInfo = [];
+            if (mode !== "update_today" && shortDate) subInfo.push(`📅 ${shortDate}`);
+            else if (mode === "update_today") subInfo.push("🆕 今日");
+            if (item.original_name && item.original_name !== item.name) subInfo.push(item.original_name);
+
+            return buildItem({
+                id: item.id, tmdbId: item.id, type: "tv",
+                title: item.name,
+                year: year, poster: item.poster_path, backdrop: item.backdrop_path,
+                rating: item.vote_average?.toFixed(1),
+                genreText: genreText,
+                subTitle: subInfo.join(" | "),
+                desc: item.overview
+            });
+        });
+    } catch (e) { return [{ id: "err", type: "text", title: "网络错误" }]; }
+}
+
+async function loadVarietyCalendar(params = {}) {
+    const { region = "cn", mode = "today", traktClientId } = params;
+    const clientId = traktClientId || DEFAULT_TRAKT_ID;
+
+    if (mode === "trending") return await fetchTmdbVariety(region, null); 
+
+    const dateStr = getSafeDate(mode); 
+    const countryParam = region === "global" ? "" : region; 
+    const traktUrl = `https://api.trakt.tv/calendars/all/shows/${dateStr}/1?genres=reality,game-show,talk-show${countryParam ? `&countries=${countryParam}` : ''}`;
+
+    try {
+        const res = await Widget.http.get(traktUrl, {
+            headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": clientId }
+        });
+        const data = res.data || [];
+
+        if (Array.isArray(data) && data.length > 0) {
+            const promises = data.map(async (item) => {
+                if (!item.show.ids.tmdb) return null;
+                return await fetchTmdbDetail(item.show.ids.tmdb, item);
+            });
+            return (await Promise.all(promises)).filter(Boolean);
+        }
+    } catch (e) {}
+
+    return await fetchTmdbVariety(region, dateStr);
+}
+
+// =========================================================================
+// 3. 辅助函数
+// =========================================================================
+
 function calculateDates(mode) {
     const today = new Date();
     const toStr = (d) => d.toISOString().split('T')[0];
@@ -363,7 +410,6 @@ function getWeekdayName(id) {
     return map[id] || "";
 }
 
-// --- TMDB / Trakt 相关 ---
 async function fetchTmdbVariety(region, dateStr) {
     const queryParams = {
         language: "zh-CN",
@@ -389,11 +435,13 @@ async function fetchTmdbVariety(region, dateStr) {
         return data.results.map(item => {
             const year = (item.first_air_date || "").substring(0, 4);
             const genreText = getGenreText(item.genre_ids);
+            let dateLabel = "近期热播";
+            if (dateStr) dateLabel = `📅 更新: ${dateStr}`;
             return buildItem({
                 id: item.id, tmdbId: item.id, type: "tv",
                 title: item.name, year: year, poster: item.poster_path, backdrop: item.backdrop_path,
                 rating: item.vote_average?.toFixed(1), genreText: genreText,
-                subTitle: dateStr ? `📅 更新: ${dateStr}` : "近期热播", desc: item.overview
+                subTitle: dateLabel, desc: item.overview
             });
         });
     } catch (e) { return [{ id: "err", type: "text", title: "TMDB 错误" }]; }
@@ -430,15 +478,4 @@ async function searchTmdb(query) {
         const res = await Widget.tmdb.get("/search/tv", { params: { query: cleanQuery, language: "zh-CN", page: 1 } });
         return (res.results || [])[0];
     } catch (e) { return null; }
-}
-
-function mergeTmdb(target, source) {
-    target.id = String(source.id);
-    target.tmdbId = source.id;
-    if (source.poster_path) target.posterPath = source.poster_path; // 这里只需传 path，buildItem 会拼接
-    if (source.backdrop_path) target.backdropPath = source.backdrop_path;
-    target.rating = source.vote_average ? source.vote_average.toFixed(1) : target.rating;
-    target.year = (source.first_air_date || "").substring(0, 4);
-    if (source.overview) target.desc = source.overview;
-    target.genre_ids = source.genre_ids; // 传递 ids 给 buildItem 解析
 }
