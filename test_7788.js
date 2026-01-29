@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "全球追剧时刻表 (双擎版)",
     author: "MakkaPakka",
     description: "聚合全球剧集/综艺。Trakt精准数据 + TMDB智能兜底，内置公用Key。",
-    version: "3.0.0",
+    version: "3.0.1",
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
 
