@@ -1,207 +1,309 @@
 WidgetMetadata = {
-    id: "trakt_personal_full_v5",
-    title: "Trakt 个人中心 (全功能)",
+    id: "universal_video_hub_final",
+    title: "全能影视聚合",
     author: "MakkaPakka",
-    description: "支持【未来时间轴】、【更新倒序】、【观看倒序】三种追剧模式。",
-    version: "5.0.0",
+    description: "聚合 在线之家/Libvio/AGE动漫/茶杯狐。去除了已失效的低端影视。",
+    version: "3.1.0",
     requiredVersion: "0.0.1",
-    site: "https://trakt.tv",
-
-    globalParams: [
-        { name: "traktUser", title: "Trakt 用户名 (必填)", type: "input", value: "" },
-        { name: "traktClientId", title: "Trakt Client ID (必填)", type: "input", value: "" }
-    ],
+    site: "https://zxzj.site",
 
     modules: [
         {
-            title: "我的片单",
-            functionName: "loadTraktProfile",
-            type: "list",
-            cacheDuration: 300,
+            title: "美剧韩剧 (在线之家)",
+            functionName: "loadZxzj",
+            type: "video",
             params: [
-                {
-                    name: "section",
-                    title: "浏览区域",
-                    type: "enumeration",
-                    value: "updates",
+                { name: "page", title: "页码", type: "page" },
+                { 
+                    name: "type", title: "分类", type: "enumeration", value: "1",
                     enumOptions: [
-                        { title: "📅 追剧日历", value: "updates" },
-                        { title: "📜 待看列表", value: "watchlist" },
-                        { title: "📦 收藏列表", value: "collection" },
-                        { title: "🕒 观看历史", value: "history" }
+                        { title: "🎬 电影", value: "1" },
+                        { title: "🇺🇸 美剧", value: "2" },
+                        { title: "🇰🇷 韩剧", value: "3" },
+                        { title: "🇯🇵 日剧", value: "4" },
+                        { title: "🐲 动漫", value: "5" }
                     ]
-                },
+                }
+            ]
+        },
+        {
+            title: "综合影视 (Libvio)",
+            functionName: "loadLibvio",
+            type: "video",
+            params: [
+                { name: "page", title: "页码", type: "page" },
                 {
-                    name: "type",
-                    title: "内容筛选",
-                    type: "enumeration",
-                    value: "all",
-                    belongTo: { paramName: "section", value: ["watchlist", "collection", "history"] },
-                    enumOptions: [ { title: "全部", value: "all" }, { title: "剧集", value: "shows" }, { title: "电影", value: "movies" } ]
-                },
-                // 追剧日历专用排序 (3个选项)
-                {
-                    name: "updateSort",
-                    title: "追剧模式",
-                    type: "enumeration",
-                    value: "future_first",
-                    belongTo: { paramName: "section", value: ["updates"] },
+                    name: "type", title: "分类", type: "enumeration", value: "1",
                     enumOptions: [
-                        { title: "🔜 从今天往后", value: "future_first" },
-                        { title: "🔄 按更新倒序", value: "air_date_desc" },
-                        { title: "👁️ 按观看倒序", value: "watched_at" } // 补回来的
+                        { title: "🎬 电影", value: "1" },
+                        { title: "📺 剧集", value: "2" },
+                        { title: "🇯🇵 日韩", value: "15" },
+                        { title: "🇺🇸 欧美", value: "16" }
                     ]
-                },
-                { name: "page", title: "页码", type: "page" }
+                }
+            ]
+        },
+        {
+            title: "二次元 (AGE动漫)",
+            functionName: "loadAgeDm",
+            type: "video",
+            params: [
+                { name: "page", title: "页码", type: "page" },
+                {
+                    name: "status", title: "状态", type: "enumeration", value: "all",
+                    enumOptions: [
+                        { title: "全部", value: "all" },
+                        { title: "连载中", value: "1" },
+                        { title: "已完结", value: "2" }
+                    ]
+                }
+            ]
+        },
+        {
+            title: "全网搜片 (茶杯狐)",
+            functionName: "loadCupFox",
+            type: "video",
+            params: [
+                { name: "keyword", title: "搜索关键词", type: "input", value: "庆余年" }
             ]
         }
     ]
 };
 
-async function loadTraktProfile(params = {}) {
-    const { traktUser, traktClientId, section, updateSort = "future_first", type = "all", page = 1 } = params;
+// ==========================================
+// 1. 在线之家 (Zxzj)
+// ==========================================
+const ZXZJ_URL = "https://www.zxzj.site"; 
 
-    if (!traktUser || !traktClientId) return [{ id: "err", type: "text", title: "请填写用户名和Client ID" }];
+async function loadZxzj(params = {}) {
+    const { page = 1, type = "1" } = params;
+    const url = `${ZXZJ_URL}/vodshow/${type}--------${page}---.html`;
 
-    // === A. 追剧日历 (Updates) ===
-    if (section === "updates") {
-        return await loadUpdatesLogic(traktUser, traktClientId, updateSort, page);
-    }
-
-    // === B. 常规列表 ===
-    let rawItems = [];
-    const sortType = "added,desc";
-    if (type === "all") {
-        const [movies, shows] = await Promise.all([
-            fetchTraktList(section, "movies", sortType, page, traktUser, traktClientId),
-            fetchTraktList(section, "shows", sortType, page, traktUser, traktClientId)
-        ]);
-        rawItems = [...movies, ...shows];
-    } else {
-        rawItems = await fetchTraktList(section, type, sortType, page, traktUser, traktClientId);
-    }
-    rawItems.sort((a, b) => new Date(getItemTime(b, section)) - new Date(getItemTime(a, section)));
-    
-    if (!rawItems || rawItems.length === 0) return page === 1 ? [{ id: "empty", type: "text", title: "列表为空" }] : [];
-
-    const promises = rawItems.map(async (item) => {
-        const subject = item.show || item.movie || item;
-        if (!subject?.ids?.tmdb) return null;
-        let subInfo = "";
-        const timeStr = getItemTime(item, section);
-        if (timeStr) subInfo = timeStr.split('T')[0];
-        if (type === "all") subInfo = `[${item.show ? "剧" : "影"}] ${subInfo}`;
-        return await fetchTmdbDetail(subject.ids.tmdb, item.show ? "tv" : "movie", subInfo, subject.title);
-    });
-    return (await Promise.all(promises)).filter(Boolean);
-}
-
-// 核心：追剧日历逻辑
-async function loadUpdatesLogic(user, id, sort, page) {
-    const url = `https://api.trakt.tv/users/${user}/watched/shows?extended=noseasons&limit=100`;
     try {
         const res = await Widget.http.get(url, {
-            headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": id }
+            headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X)" }
         });
-        const data = res.data || [];
-        if (data.length === 0) return [{ id: "empty", type: "text", title: "无观看记录" }];
+        const html = res.data;
+        const $ = Widget.html.load(html);
+        const results = [];
 
-        const enrichedShows = await Promise.all(data.slice(0, 60).map(async (item) => {
-            if (!item.show?.ids?.tmdb) return null;
-            const tmdb = await fetchTmdbShowDetails(item.show.ids.tmdb);
-            if (!tmdb) return null;
-            
-            const nextAir = tmdb.next_episode_to_air?.air_date;
-            const lastAir = tmdb.last_episode_to_air?.air_date;
-            const sortDate = nextAir || lastAir || "1970-01-01";
-            const today = new Date().toISOString().split('T')[0];
-            const isFuture = sortDate >= today;
+        $(".stui-vodlist__box").each((i, el) => {
+            const $el = $(el);
+            const href = $el.find("a.stui-vodlist__thumb").attr("href");
+            const title = $el.find("a.stui-vodlist__thumb").attr("title");
+            const img = $el.find("a.stui-vodlist__thumb").attr("data-original");
+            const status = $el.find(".pic-text").text();
 
-            return {
-                trakt: item, tmdb: tmdb,
-                sortDate: sortDate,
-                isFuture: isFuture,
-                watchedDate: item.last_watched_at // 用于 watched_at 排序
-            };
-        }));
+            if (href) {
+                results.push({
+                    id: href,
+                    type: "link",
+                    title: title,
+                    coverUrl: img,
+                    subTitle: status,
+                    link: `${ZXZJ_URL}${href}`,
+                    extra: { provider: "zxzj" }
+                });
+            }
+        });
+        return results;
+    } catch (e) { return [{ id: "err", type: "text", title: "在线之家加载失败" }]; }
+}
 
-        const valid = enrichedShows.filter(Boolean);
+// ==========================================
+// 2. Libvio
+// ==========================================
+const LIB_URL = "https://libvio.app";
+
+async function loadLibvio(params = {}) {
+    const { page = 1, type = "1" } = params;
+    const url = `${LIB_URL}/show/${type}--------${page}---.html`;
+
+    try {
+        const res = await Widget.http.get(url, {
+            headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" }
+        });
+        const html = res.data;
+        const $ = Widget.html.load(html);
+        const results = [];
+
+        $(".stui-vodlist__box").each((i, el) => {
+            const $el = $(el);
+            const href = $el.find("a.stui-vodlist__thumb").attr("href");
+            const title = $el.find("a.stui-vodlist__thumb").attr("title");
+            const img = $el.find("a.stui-vodlist__thumb").attr("data-original");
+            const status = $el.find(".pic-text").text();
+
+            if (href) {
+                results.push({
+                    id: href,
+                    type: "link",
+                    title: title,
+                    coverUrl: img,
+                    subTitle: status,
+                    link: `${LIB_URL}${href}`,
+                    extra: { provider: "libvio" }
+                });
+            }
+        });
+        return results;
+    } catch (e) { return [{ id: "err", type: "text", title: "Libvio 加载失败" }]; }
+}
+
+// ==========================================
+// 3. AGE动漫
+// ==========================================
+const AGE_URL = "https://www.agemys.net";
+
+async function loadAgeDm(params = {}) {
+    const { page = 1, status = "all" } = params;
+    const url = `${AGE_URL}/catalog/all-${status}-all-all-all-time-${page}`;
+
+    try {
+        const res = await Widget.http.get(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+        const html = res.data;
+        const $ = Widget.html.load(html);
+        const results = [];
+
+        $(".video_item").each((i, el) => {
+            const $el = $(el);
+            const href = $el.find("a").attr("href");
+            const title = $el.find(".title").text().trim();
+            const img = $el.find("img").attr("src");
+            const ep = $el.find(".info").text().trim();
+
+            if (href) {
+                results.push({
+                    id: href,
+                    type: "link",
+                    title: title,
+                    coverUrl: img,
+                    subTitle: ep,
+                    link: `${AGE_URL}${href}`,
+                    extra: { provider: "age" }
+                });
+            }
+        });
+        return results;
+    } catch (e) { return [{ id: "err", type: "text", title: "AGE动漫加载失败" }]; }
+}
+
+// ==========================================
+// 4. 茶杯狐 (CupFox)
+// ==========================================
+const CUPFOX_URL = "https://cupfox.app";
+
+async function loadCupFox(params = {}) {
+    const { keyword } = params;
+    if (!keyword) return [{ id: "info", type: "text", title: "请输入关键词" }];
+
+    const url = `${CUPFOX_URL}/search?key=${encodeURIComponent(keyword)}`;
+    try {
+        const res = await Widget.http.get(url);
+        const html = res.data;
+        const $ = Widget.html.load(html);
+        const results = [];
+
+        $(".search-result-item").each((i, el) => {
+            const $el = $(el);
+            const href = $el.find("a").attr("href");
+            const title = $el.find(".text-truncate").text().trim();
+            const img = $el.find("img").attr("data-src") || $el.find("img").attr("src");
+            const source = $el.find(".text-muted").last().text().trim();
+
+            if (href) {
+                results.push({
+                    id: href,
+                    type: "link",
+                    title: title,
+                    coverUrl: img,
+                    link: href.startsWith("http") ? href : `${CUPFOX_URL}${href}`,
+                    description: `来源: ${source}`,
+                    extra: { provider: "cupfox" }
+                });
+            }
+        });
+        return results;
+    } catch (e) { return []; }
+}
+
+// ==========================================
+// 5. 详情与播放解析 (Router)
+// ==========================================
+
+async function loadDetail(link) {
+    if (link.includes("zxzj")) return await parseZxzj(link);
+    if (link.includes("libvio")) return await parseLibvio(link);
+    if (link.includes("agemys")) return await parseAge(link);
+    if (link.includes("cupfox")) return await parseCupFox(link);
+    return [{ id: "web", type: "webview", title: "网页播放", link: link }];
+}
+
+// A. 在线之家解析
+async function parseZxzj(link) {
+    try {
+        const res = await Widget.http.get(link);
+        const $ = Widget.html.load(res.data);
+        const playUrlRelative = $(".stui-content__playlist a").first().attr("href");
+        if (!playUrlRelative) return [{ id: "err", type: "text", title: "未找到播放列表" }];
         
-        // --- 排序逻辑 ---
-        if (sort === "future_first") {
-            const futureShows = valid.filter(s => s.isFuture && s.tmdb.next_episode_to_air);
-            const pastShows = valid.filter(s => !s.isFuture || !s.tmdb.next_episode_to_air);
-            futureShows.sort((a, b) => new Date(a.sortDate) - new Date(b.sortDate)); // 正序
-            pastShows.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));   // 倒序
-            valid.length = 0; 
-            valid.push(...futureShows, ...pastShows);
-        } else if (sort === "air_date_desc") {
-            // 更新时间倒序
-            valid.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
-        } else {
-            // 观看时间倒序 (默认 & 补回)
-            valid.sort((a, b) => new Date(b.watchedDate) - new Date(a.watchedDate));
+        const playUrl = `${ZXZJ_URL}${playUrlRelative}`;
+        const res2 = await Widget.http.get(playUrl);
+        const jsonMatch = res2.data.match(/player_aaaa\s*=\s*({.*?})/);
+        if (jsonMatch) {
+            const json = JSON.parse(jsonMatch[1]);
+            return [{
+                id: link,
+                type: "video",
+                title: $("h1").text().trim(),
+                videoUrl: json.url,
+                playerType: "system",
+                customHeaders: { "Referer": ZXZJ_URL }
+            }];
         }
-
-        const start = (page - 1) * 15;
-        return valid.slice(start, start + 15).map(item => {
-            const d = item.tmdb;
-            let dateLabel = "暂无排期", epInfo = "已完结";
-            
-            if (d.next_episode_to_air) {
-                dateLabel = `🔜 ${d.next_episode_to_air.air_date}`; 
-                epInfo = `S${d.next_episode_to_air.season_number}E${d.next_episode_to_air.episode_number}`;
-            } else if (d.last_episode_to_air) {
-                dateLabel = `📅 ${d.last_episode_to_air.air_date}`;
-                epInfo = `S${d.last_episode_to_air.season_number}E${d.last_episode_to_air.episode_number}`;
-            }
-            
-            // 如果是按观看时间排序，可以在副标题提示观看时间
-            if (sort === "watched_at") {
-                dateLabel = `👁️ ${item.watchedDate.split('T')[0]}`;
-            }
-            
-            return {
-                id: String(d.id), tmdbId: d.id, type: "tmdb", mediaType: "tv",
-                title: d.name, genreTitle: dateLabel, subTitle: epInfo,
-                posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : "",
-                description: `上次观看: ${item.watchedDate.split("T")[0]}\n${d.overview}`
-            };
-        });
-    } catch (e) { return []; }
+    } catch (e) {}
+    return [{ id: "web", type: "webview", title: "网页播放", link: link }];
 }
 
-async function fetchTraktList(section, type, sort, page, user, id) {
-    const limit = 20; 
-    const url = `https://api.trakt.tv/users/${user}/${section}/${type}?extended=full&page=${page}&limit=${limit}`;
+// B. Libvio 解析
+async function parseLibvio(link) {
     try {
-        const res = await Widget.http.get(url, {
-            headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": id }
-        });
-        return Array.isArray(res.data) ? res.data : [];
-    } catch (e) { return []; }
+        const res = await Widget.http.get(link);
+        const $ = Widget.html.load(res.data);
+        const playHref = $(".stui-content__playlist a").first().attr("href");
+        if (playHref) {
+            const playUrl = `${LIB_URL}${playHref}`;
+            const res2 = await Widget.http.get(playUrl);
+            const match = res2.data.match(/"url":"([^"]+)"/);
+            if (match) {
+                return [{
+                    id: link,
+                    type: "video",
+                    title: "Libvio 播放",
+                    videoUrl: match[1],
+                    playerType: "system"
+                }];
+            }
+        }
+    } catch (e) {}
+    return [{ id: "web", type: "webview", title: "网页播放", link: link }];
 }
 
-async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
+// C. AGE 解析 (Webview)
+async function parseAge(link) {
     try {
-        const d = await Widget.tmdb.get(`/${type}/${id}`, { params: { language: "zh-CN" } });
-        const year = (d.first_air_date || d.release_date || "").substring(0, 4);
-        return {
-            id: String(d.id), tmdbId: d.id, type: "tmdb", mediaType: type,
-            title: d.name || d.title || originalTitle,
-            genreTitle: year, subTitle: subInfo, description: d.overview,
-            posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : ""
-        };
-    } catch (e) { return null; }
+        const res = await Widget.http.get(link);
+        const $ = Widget.html.load(res.data);
+        const playHref = $(".movurl li a").first().attr("href");
+        if (playHref) {
+            const playUrl = `${AGE_URL}${playHref}`;
+            return [{ id: playUrl, type: "webview", title: "AGE 播放", link: playUrl }];
+        }
+    } catch (e) {}
+    return [{ id: "web", type: "webview", title: "网页播放", link: link }];
 }
 
-async function fetchTmdbShowDetails(id) {
-    try { return await Widget.tmdb.get(`/tv/${id}`, { params: { language: "zh-CN" } }); } catch (e) { return null; }
-}
-
-function getItemTime(item, section) {
-    if (section === "watchlist") return item.listed_at;
-    if (section === "history") return item.watched_at;
-    if (section === "collection") return item.collected_at;
-    return item.created_at || "1970-01-01";
+// D. 茶杯狐 (Webview)
+async function parseCupFox(link) {
+    return [{ id: link, type: "webview", title: "茶杯狐播放", link: link }];
 }
