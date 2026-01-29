@@ -11,7 +11,7 @@ WidgetMetadata = {
     globalParams: [
         {
             name: "traktClientId",
-            title: "Trakt Client ID (选填，填写后更新时间更准确)",
+            title: " (选填，填写后更新时间更准确)",
             type: "input",
             description: "不填则使用内置公用 ID (推荐)。",
             value: ""
