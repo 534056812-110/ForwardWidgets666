@@ -1,11 +1,12 @@
 WidgetMetadata = {
-    id: "ultimate_media_hub_trakt_mixed",
-    title: "全球影视 | 分流聚合 (增强版)",
-    author: "MakkaPakka",
-    description: "Trakt 榜单支持【全部/剧集/电影】混合查看，功能更全。",
-    version: "6.1.0",
+    id: "ultimate_media_hub_pro_",
+    title: "全球影视 | 分流聚合",
+    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+    description: "集大成之作：Trakt/豆瓣/平台分流，全线支持【年份•类型】展示。",
+    version: "1.2.0",
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
+    // 1. 全局参数 (仅剩 Trakt ID，且选填)
 
     // 1. 全局参数 (仅剩 Trakt ID，且选填)
     globalParams: [
