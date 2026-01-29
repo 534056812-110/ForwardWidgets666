@@ -1,27 +1,24 @@
 WidgetMetadata = {
-    id: "makka_global_tv_calendar_fix",
-    title: "全球追剧时刻表 (综艺修复)",
+    id: "global_tv_calendar_smart",
+    title: "全球追剧时刻表 (双擎版)",
     author: "MakkaPakka",
-    description: "聚合全球剧集更新与综艺排期。修复综艺更新日期不准问题。",
-    version: "2.1.0",
+    description: "聚合全球剧集/综艺。Trakt精准数据 + TMDB智能兜底，内置公用Key。",
+    version: "3.0.0",
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
 
-    // 1. 全局参数 (仅 Trakt 选填)
+    // 1. 全局参数
     globalParams: [
         {
             name: "traktClientId",
-            title: "Trakt Client ID (选填)",
+            title: "Trakt Client ID (选填，填写后更新时间更准确)",
             type: "input",
-            description: "综艺模块专用，不填则使用公共 ID。",
+            description: "不填则使用内置公用 ID (推荐)。",
             value: ""
         }
     ],
 
     modules: [
-        // ===========================================
-        // 模块 1: 追剧日历 (电视剧) - 保持原样
-        // ===========================================
         {
             title: "追剧日历 (Drama)",
             functionName: "loadTvCalendar",
@@ -57,10 +54,6 @@ WidgetMetadata = {
                 { name: "page", title: "页码", type: "page" }
             ]
         },
-
-        // ===========================================
-        // 模块 2: 综艺时刻 (Variety) - 核心修复
-        // ===========================================
         {
             title: "综艺时刻 (Variety)",
             functionName: "loadVarietyCalendar",
@@ -86,9 +79,9 @@ WidgetMetadata = {
                     type: "enumeration",
                     value: "today",
                     enumOptions: [
-                        { title: "今日更新", value: "today" },
-                        { title: "明日预告", value: "tomorrow" },
-                        { title: "近期热播 (不限时间)", value: "trending" }
+                        { title: "今日更新 (Trakt优先)", value: "today" },
+                        { title: "明日预告 (Trakt优先)", value: "tomorrow" },
+                        { title: "近期热播 (TMDB源)", value: "trending" }
                     ]
                 }
             ]
@@ -96,6 +89,11 @@ WidgetMetadata = {
     ]
 };
 
+// =========================================================================
+// 0. 通用配置
+// =========================================================================
+
+// Kodi 社区公用 Key，稳定性极高
 const DEFAULT_TRAKT_ID = "003666572e92c4331002a28114387693994e43f5454659f81640a232f08a5996";
 
 const GENRE_MAP = {
@@ -128,12 +126,137 @@ function buildItem({ id, tmdbId, type, title, year, poster, backdrop, rating, ge
 }
 
 // =========================================================================
-// 1. 业务逻辑：追剧日历 (Drama) - 保持原样
+// 1. 综艺时刻 (Variety) - 智能双擎
+// =========================================================================
+
+async function loadVarietyCalendar(params = {}) {
+    const { region = "cn", mode = "today", traktClientId } = params;
+    
+    // 智能 Key 选择：用户填了就用用户的，没填就用内置的
+    const clientId = traktClientId && traktClientId.length > 50 ? traktClientId : DEFAULT_TRAKT_ID;
+
+    // A. 强制热播模式 (直接走 TMDB)
+    if (mode === "trending") {
+        return await fetchTmdbVariety(region, null); 
+    }
+
+    // B. Trakt 优先模式
+    const dateStr = getSafeDate(mode); 
+    const countryParam = region === "global" ? "" : region; 
+    
+    // 综艺类型：Reality, Game Show, Talk Show
+    const traktUrl = `https://api.trakt.tv/calendars/all/shows/${dateStr}/1?genres=reality,game-show,talk-show${countryParam ? `&countries=${countryParam}` : ''}`;
+
+    try {
+        console.log(`[Trakt] Fetching: ${traktUrl} (Key: ${clientId.substring(0,5)}...)`);
+        
+        const res = await Widget.http.get(traktUrl, {
+            headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": clientId }
+        });
+        const data = res.data || [];
+
+        // 如果 Trakt 有数据，直接使用
+        if (Array.isArray(data) && data.length > 0) {
+            const promises = data.map(async (item) => {
+                if (!item.show.ids.tmdb) return null;
+                return await fetchTmdbDetail(item.show.ids.tmdb, item);
+            });
+            return (await Promise.all(promises)).filter(Boolean);
+        }
+    } catch (e) {
+        console.log("[Trakt] Failed, switching to TMDB...");
+    }
+
+    // C. 兜底模式 (Trakt 无数据/失败时，走 TMDB 精准日期)
+    return await fetchTmdbVariety(region, dateStr);
+}
+
+// TMDB 综艺获取
+async function fetchTmdbVariety(region, dateStr) {
+    const queryParams = {
+        language: "zh-CN",
+        sort_by: "popularity.desc", 
+        page: 1,
+        with_genres: "10764|10767", // Reality | Talk
+        include_null_first_air_dates: false,
+        timezone: "Asia/Shanghai" 
+    };
+
+    if (region !== "global") {
+        queryParams.with_origin_country = region.toUpperCase();
+    }
+
+    if (dateStr) {
+        // 如果指定了日期，尝试筛选 air_date
+        // 注意：TMDB Discover 对单集 air_date 筛选支持有限，这里作为尽力而为的兜底
+        queryParams["air_date.gte"] = dateStr;
+        queryParams["air_date.lte"] = dateStr;
+    } else {
+        queryParams.sort_by = "first_air_date.desc";
+    }
+
+    try {
+        const res = await Widget.tmdb.get("/discover/tv", { params: queryParams });
+        const data = res || {};
+        
+        if (!data.results || data.results.length === 0) {
+            return [{ id: "empty", type: "text", title: "暂无综艺更新", subTitle: dateStr ? `${dateStr} 无数据` : "暂无数据" }];
+        }
+
+        return data.results.map(item => {
+            const year = (item.first_air_date || "").substring(0, 4);
+            const genreText = getGenreText(item.genre_ids);
+            
+            // 构造日期标签
+            let dateLabel = "近期热播";
+            if (dateStr) dateLabel = `📅 更新: ${dateStr}`;
+
+            return buildItem({
+                id: item.id, tmdbId: item.id, type: "tv",
+                title: item.name, 
+                year: year, 
+                poster: item.poster_path, 
+                backdrop: item.backdrop_path,
+                rating: item.vote_average?.toFixed(1),
+                genreText: genreText,
+                subTitle: dateLabel, 
+                desc: item.overview
+            });
+        });
+
+    } catch (e) { return [{ id: "err", type: "text", title: "TMDB 错误" }]; }
+}
+
+// Trakt 详情转 TMDB
+async function fetchTmdbDetail(tmdbId, traktItem) {
+    try {
+        const d = await Widget.tmdb.get(`/tv/${tmdbId}`, { params: { language: "zh-CN" } });
+        if (!d) return null;
+
+        const ep = traktItem.episode;
+        const airTime = traktItem.first_aired.split("T")[0];
+        const genreText = (d.genres || []).map(g => g.name).slice(0, 2).join(" / ");
+
+        return buildItem({
+            id: d.id, tmdbId: d.id, type: "tv",
+            title: d.name || traktItem.show.title,
+            year: (d.first_air_date || "").substring(0, 4),
+            poster: d.poster_path, backdrop: d.backdrop_path,
+            rating: d.vote_average?.toFixed(1),
+            genreText: genreText,
+            subTitle: `S${ep.season}E${ep.number} · ${ep.title || "更新"}`, // Trakt 精准单集
+            desc: d.overview
+        });
+    } catch (e) { return null; }
+}
+
+// =========================================================================
+// 2. 业务逻辑：追剧日历 (Drama)
 // =========================================================================
 
 async function loadTvCalendar(params = {}) {
     const { mode = "update_today", region = "Global", page = 1 } = params;
-    const dates = calculateDates(mode); // 计算日期范围
+    const dates = calculateDates(mode);
     const isPremiere = mode.includes("premiere");
     
     const queryParams = {
@@ -184,129 +307,6 @@ async function loadTvCalendar(params = {}) {
     } catch (e) { return [{ id: "err", type: "text", title: "网络错误" }]; }
 }
 
-// =========================================================================
-// 2. 业务逻辑：综艺时刻 (Variety) - 核心修复
-// =========================================================================
-
-async function loadVarietyCalendar(params = {}) {
-    const { region = "cn", mode = "today", traktClientId } = params;
-    const clientId = traktClientId || DEFAULT_TRAKT_ID;
-
-    // A. 强制热播模式 (不限时间)
-    if (mode === "trending") {
-        return await fetchTmdbVariety(region, null); // 不传日期，默认最新
-    }
-
-    // B. 日期模式 (Today/Tomorrow)
-    // 1. 先尝试 Trakt
-    const dateStr = getSafeDate(mode); // 获取 YYYY-MM-DD
-    const countryParam = region === "global" ? "" : region; 
-    const traktUrl = `https://api.trakt.tv/calendars/all/shows/${dateStr}/1?genres=reality,game-show,talk-show${countryParam ? `&countries=${countryParam}` : ''}`;
-
-    try {
-        const res = await Widget.http.get(traktUrl, {
-            headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": clientId }
-        });
-        const data = res.data || [];
-
-        if (Array.isArray(data) && data.length > 0) {
-            const promises = data.map(async (item) => {
-                if (!item.show.ids.tmdb) return null;
-                return await fetchTmdbDetail(item.show.ids.tmdb, item);
-            });
-            return (await Promise.all(promises)).filter(Boolean);
-        }
-    } catch (e) {}
-
-    // 2. Trakt 无数据，使用 TMDB 精准日期兜底
-    // 这里的关键是把 dateStr 传给 TMDB，强制 TMDB 筛选"当天播出"
-    return await fetchTmdbVariety(region, dateStr);
-}
-
-// =========================================================================
-// 3. 辅助函数
-// =========================================================================
-
-async function fetchTmdbVariety(region, dateStr) {
-    const queryParams = {
-        language: "zh-CN",
-        sort_by: "popularity.desc", // 按热度，因为我们已经限定了日期
-        page: 1,
-        with_genres: "10764|10767", // Reality | Talk
-        include_null_first_air_dates: false,
-        timezone: "Asia/Shanghai" // 确保时区对齐
-    };
-
-    if (region !== "global") {
-        queryParams.with_origin_country = region.toUpperCase();
-    }
-
-    // 核心修改：如果传入了具体日期，就筛选 air_date
-    if (dateStr) {
-        queryParams["air_date.gte"] = dateStr;
-        queryParams["air_date.lte"] = dateStr;
-    } else {
-        // 如果没传日期(trending模式)，则按首播时间降序，找最新的
-        queryParams.sort_by = "first_air_date.desc";
-    }
-
-    try {
-        const res = await Widget.tmdb.get("/discover/tv", { params: queryParams });
-        const data = res || {};
-        
-        if (!data.results || data.results.length === 0) {
-            return [{ id: "empty", type: "text", title: "暂无综艺更新", subTitle: dateStr ? `${dateStr} 无更新` : "暂无数据" }];
-        }
-
-        return data.results.map(item => {
-            const year = (item.first_air_date || "").substring(0, 4);
-            const genreText = getGenreText(item.genre_ids);
-            
-            // 构造日期标签
-            let dateLabel = "近期热播";
-            if (dateStr) {
-                dateLabel = `📅 更新: ${dateStr}`;
-            }
-
-            return buildItem({
-                id: item.id, tmdbId: item.id, type: "tv",
-                title: item.name, 
-                year: year, 
-                poster: item.poster_path, 
-                backdrop: item.backdrop_path,
-                rating: item.vote_average?.toFixed(1),
-                genreText: genreText,
-                subTitle: dateLabel, // 显示准确的日期状态
-                desc: item.overview
-            });
-        });
-
-    } catch (e) { return [{ id: "err", type: "text", title: "TMDB 错误" }]; }
-}
-
-async function fetchTmdbDetail(tmdbId, traktItem) {
-    try {
-        const d = await Widget.tmdb.get(`/tv/${tmdbId}`, { params: { language: "zh-CN" } });
-        if (!d) return null;
-
-        const ep = traktItem.episode;
-        const airTime = traktItem.first_aired.split("T")[0];
-        const genreText = (d.genres || []).map(g => g.name).slice(0, 2).join(" / ");
-
-        return buildItem({
-            id: d.id, tmdbId: d.id, type: "tv",
-            title: d.name || traktItem.show.title,
-            year: (d.first_air_date || "").substring(0, 4),
-            poster: d.poster_path, backdrop: d.backdrop_path,
-            rating: d.vote_average?.toFixed(1),
-            genreText: genreText,
-            subTitle: `S${ep.season}E${ep.number} · ${ep.title || "更新"}`, // Trakt 特有的单集信息
-            desc: d.overview
-        });
-    } catch (e) { return null; }
-}
-
-// 剧集模块用的日期计算器 (保留原样)
 function calculateDates(mode) {
     const today = new Date();
     const toStr = (d) => d.toISOString().split('T')[0];
@@ -327,7 +327,6 @@ function calculateDates(mode) {
     return { start: toStr(today), end: toStr(today) };
 }
 
-// 综艺模块用的简单日期 (YYYY-MM-DD)
 function getSafeDate(mode) {
     const d = new Date();
     if (mode === "tomorrow") d.setDate(d.getDate() + 1);
