@@ -1,9 +1,9 @@
 WidgetMetadata = {
-    id: "variety_hub_ultimate_v3_ui",
-    title: "全球综艺榜",
+    id: "variety_hub_ultimate_v4_fix",
+    title: "全球综艺追更热度榜",
     author: "Makkapakka",
-    description: "综艺更新时刻表｜综艺热榜",
-    version: "3.0.1",
+    description: "综艺更新时间表$热度榜",
+    version: "2.0.1",
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
 
@@ -56,17 +56,6 @@ WidgetMetadata = {
 // =========================================================================
 // 0. 工具函数
 // =========================================================================
-
-const GENRE_MAP = {
-    10764: "真人秀", 10767: "脱口秀", 10763: "新闻", 
-    35: "喜剧", 10751: "家庭", 18: "剧情"
-};
-
-function getGenreText(ids) {
-    if (!ids || !Array.isArray(ids)) return "综艺";
-    const target = ids.find(id => id === 10764 || id === 10767) || ids[0];
-    return GENRE_MAP[target] || "综艺";
-}
 
 // 格式化日期 MM-30
 function formatShortDate(dateStr) {
@@ -138,27 +127,26 @@ async function loadVarietyUltimate(params = {}) {
                 const lastEp = detail.last_episode_to_air;
                 
                 let sortDate = "1970-01-01";
-                let displayDateLabel = "";
-                let displayEpLabel = "";
+                let displayInfoStr = ""; // 核心显示字符串
 
                 if (nextEp) {
                     sortDate = nextEp.air_date;
-                    displayDateLabel = formatShortDate(sortDate);
-                    displayEpLabel = `S${nextEp.season_number}E${nextEp.episode_number}`;
+                    // 格式：01-30 S01E04
+                    displayInfoStr = `${formatShortDate(sortDate)} S${nextEp.season_number}E${nextEp.episode_number}`;
                 } else if (lastEp) {
                     sortDate = lastEp.air_date;
-                    displayDateLabel = formatShortDate(sortDate);
-                    displayEpLabel = `S${lastEp.season_number}E${lastEp.episode_number}`;
+                    // 格式：01-30 S01E04
+                    displayInfoStr = `${formatShortDate(sortDate)} S${lastEp.season_number}E${lastEp.episode_number}`;
                 } else {
                     if (listType === "calendar") return null;
                     sortDate = item.first_air_date;
+                    displayInfoStr = `${formatShortDate(sortDate)} 开播`;
                 }
 
                 return {
                     detail: detail,
                     sortDate: sortDate,
-                    displayDateLabel: displayDateLabel,
-                    displayEpLabel: displayEpLabel
+                    displayInfoStr: displayInfoStr
                 };
             } catch (e) {
                 return null;
@@ -175,26 +163,23 @@ async function loadVarietyUltimate(params = {}) {
         }
 
         return detailedItems.map(data => {
-            const { detail, displayDateLabel, displayEpLabel, sortDate } = data;
+            const { detail, displayInfoStr, sortDate } = data;
             
-            const genre = getGenreText(detail.genres ? detail.genres.map(g => g.id) : []);
+            // === 🚑 强制修复逻辑 ===
             
-            let subTitleStr = "";
-            let genreTitleStr = "";
+            let finalGenreTitle = "";
+            let finalSubTitle = "";
 
             if (listType === "calendar") {
-                // === 💡 核心修改区域 ===
-                
-                // 1. 右上角标签：显示类型（看起来更整洁）
-                genreTitleStr = genre; // 例如 "真人秀"
-                
-                // 2. 副标题：严格执行 "日期 + 季数" 格式
-                // 例如 "01-30 S01E04"
-                subTitleStr = `${displayDateLabel} ${displayEpLabel}`; 
-                
+                // 追新榜：
+                // 两个位置都填这个，确保你一定看得到！
+                // 不再显示“真人秀”这种废话
+                finalGenreTitle = displayInfoStr; // 位置1：右上角小字
+                finalSubTitle = displayInfoStr;   // 位置2：标题下方副标题
             } else {
-                genreTitleStr = `${detail.vote_average.toFixed(1)}分`;
-                subTitleStr = `🔥 热度 ${Math.round(detail.popularity)} • ${genre}`;
+                // 热度榜
+                finalGenreTitle = `${detail.vote_average.toFixed(1)}分`;
+                finalSubTitle = `🔥 热度 ${Math.round(detail.popularity)}`;
             }
 
             return {
@@ -203,11 +188,12 @@ async function loadVarietyUltimate(params = {}) {
                 type: "tmdb",
                 mediaType: "tv",
                 title: detail.name || detail.original_name,
-                genreTitle: genreTitleStr, 
-                subTitle: subTitleStr,
+                // 这里！两个位置都放更新信息
+                genreTitle: finalGenreTitle, 
+                subTitle: finalSubTitle,
                 posterPath: detail.poster_path ? `https://image.tmdb.org/t/p/w500${detail.poster_path}` : "",
                 backdropPath: detail.backdrop_path ? `https://image.tmdb.org/t/p/w780${detail.backdrop_path}` : "",
-                description: `📅 更新日期: ${sortDate}\n${detail.overview || "暂无简介"}`,
+                description: `📅 更新: ${sortDate}\n${detail.overview || "暂无简介"}`,
                 rating: detail.vote_average ? detail.vote_average.toFixed(1) : "0.0",
                 year: (detail.first_air_date || "").substring(0, 4)
             };
