@@ -1,5 +1,5 @@
 WidgetMetadata = {
-    id: "twitch_native_pro_v4",
+    id: "twitch_native_v4",
     title: "Twitch 直播 (Pro)",
     author: "Makkapakka",
     description: "V4.0 终极修复：修正 User-Agent 以绕过 Cloudflare WAF 拦截，同时使用 TV 接口获取真实流地址。",
