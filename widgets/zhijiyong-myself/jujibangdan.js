@@ -1,9 +1,9 @@
-var WidgetMetadata = {
+WidgetMetadata = {
   id: "trakt_global_lite_v3",
   title: "全球剧集榜单 (精简版)",
   author: "Makkapakka",
   description: "内置Trakt源。支持分页、自动显示日期、自动匹配资源。",
-  version: "1.1.0",
+  version: "1.1.1",
   requiredVersion: "0.0.1",
   site: "https://trakt.tv",
   
