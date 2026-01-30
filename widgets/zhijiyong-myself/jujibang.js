@@ -1,189 +1,225 @@
 WidgetMetadata = {
-  id: "trakt_globa",
-  title: "全球剧集榜单 (精简版)",
-  author: "Makkapakka",
-  description: "内置Trakt源。支持分页、自动显示日期、自动匹配资源。",
-  version: "1.1.1",
-  requiredVersion: "0.0.1",
-  site: "https://trakt.tv",
-  
-  // 移除配置项，强制内置 Key
-  globalParams: [],
+    id: "trakt_global_native",
+    title: "Trakt 全球影视榜单 (中文)",
+    author: "Makkapakka",
+    description: "基于 Trakt 大数据 + TMDB 中文补全。支持全球/各国/流媒体热度排行。",
+    version: "2.0.0",
+    requiredVersion: "0.0.1",
+    site: "https://trakt.tv",
 
-  modules: [
-    {
-      title: "影视榜单",
-      description: "浏览热门影视",
-      requiresWebView: false,
-      functionName: "loadRankings",
-      type: "list",
-      cacheDuration: 3600, 
-      params: [
-        {
-          name: "region",
-          title: "地区",
-          type: "enumeration",
-          defaultValue: "global",
-          enumOptions: [
-            { title: "🌍 全球热门", value: "global" },
-            { title: "🇺🇸 美国 (US)", value: "us" },
-            { title: "🇨🇳 中国 (CN)", value: "cn" },
-            { title: "🇰🇷 韩国 (KR)", value: "kr" },
-            { title: "🇯🇵 日本 (JP)", value: "jp" },
-            { title: "🇭🇰 香港 (HK)", value: "hk" },
-            { title: "🇬🇧 英国 (GB)", value: "gb" }
-          ]
-        },
-        {
-          name: "type",
-          title: "类型",
-          type: "enumeration",
-          defaultValue: "shows",
-          enumOptions: [
-            { title: "📺 剧集 (Shows)", value: "shows" },
-            { title: "🎬 电影 (Movies)", value: "movies" },
-            { title: "♾️ 混合展示 (Mix)", value: "all" }
-          ]
-        },
-        {
-          name: "sort",
-          title: "排序",
-          type: "enumeration",
-          defaultValue: "trending",
-          enumOptions: [
-            { title: "🔥 正在热播 (Trending)", value: "trending" },
-            { title: "❤️ 最受欢迎 (Popular)", value: "popular" },
-            { title: "🆕 最受期待 (Anticipated)", value: "anticipated" }
-          ]
-        },
-        {
-          name: "from",
-          title: "页码",
-          type: "page",
-          value: "1"
+    globalParams: [
+        { 
+            name: "traktClientId", 
+            title: "Trakt Client ID (选填)", 
+            type: "input", 
+            description: "不填则使用内置高速Key。", 
+            value: "" 
         }
-      ]
-    }
-  ]
+    ],
+
+    modules: [
+        {
+            title: "🌍 全球热榜",
+            functionName: "loadGlobalRankings",
+            type: "list",
+            cacheDuration: 3600, // 缓存1小时
+            params: [
+                {
+                    name: "type",
+                    title: "类型",
+                    type: "enumeration",
+                    defaultValue: "shows",
+                    enumOptions: [
+                        { title: "📺 热门剧集", value: "shows" },
+                        { title: "🎬 热门电影", value: "movies" },
+                        { title: "♾️ 剧集+电影", value: "all" }
+                    ]
+                },
+                {
+                    name: "sort",
+                    title: "排序依据",
+                    type: "enumeration",
+                    defaultValue: "trending",
+                    enumOptions: [
+                        { title: "🔥 正在热播 (Trending)", value: "trending" },
+                        { title: "❤️ 最受欢迎 (Popular)", value: "popular" },
+                        { title: "👁️ 观看最多 (Played)", value: "played" },
+                        { title: "🆕 最受期待 (Anticipated)", value: "anticipated" }
+                    ]
+                },
+                {
+                    name: "region",
+                    title: "地区筛选 (部分榜单生效)",
+                    type: "enumeration",
+                    defaultValue: "global",
+                    enumOptions: [
+                        { title: "🌍 全球", value: "global" },
+                        { title: "🇺🇸 美国", value: "us" },
+                        { title: "🇨🇳 中国大陆", value: "cn" },
+                        { title: "🇰🇷 韩国", value: "kr" },
+                        { title: "🇯🇵 日本", value: "jp" },
+                        { title: "🇭🇰 香港", value: "hk" },
+                        { title: "🇬🇧 英国", value: "gb" }
+                    ]
+                },
+                { name: "page", title: "页码", type: "page", value: "1" }
+            ]
+        }
+    ]
 };
 
-// ===========================
-// 常量定义
-// ===========================
+// ==========================================
+// 0. 常量与配置
+// ==========================================
 
-const TRAKT_CLIENT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e37cb45cb482";
+const DEFAULT_CLIENT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e37cb45cb482";
 const API_BASE = "https://api.trakt.tv";
 
-// ===========================
-// 主逻辑
-// ===========================
+// ==========================================
+// 1. 主逻辑
+// ==========================================
 
-async function loadRankings(params) {
-  const region = params.region || "global";
-  const type = params.type || "shows";
-  const sort = params.sort || "trending";
-  const page = parseInt(params.from) || 1;
+async function loadGlobalRankings(params = {}) {
+    // 1. 参数处理
+    const clientId = params.traktClientId || DEFAULT_CLIENT_ID;
+    const type = params.type || "shows";
+    const sort = params.sort || "trending";
+    const region = params.region || "global";
+    const page = parseInt(params.page) || 1;
 
-  let requests = [];
-  
-  if (type === "all" || type === "movies") {
-    requests.push(fetchTrakt("movies", sort, region, page));
-  }
-  
-  if (type === "all" || type === "shows") {
-    requests.push(fetchTrakt("shows", sort, region, page));
-  }
+    let rawItems = [];
 
-  try {
-    const results = await Promise.all(requests);
-    let allItems = [];
-
-    // 混合排序：交替显示
-    if (type === "all" && results.length === 2) {
-      const [movies, shows] = results;
-      const maxLen = Math.max(movies.length, shows.length);
-      for (let i = 0; i < maxLen; i++) {
-        if (movies[i]) allItems.push(movies[i]);
-        if (shows[i]) allItems.push(shows[i]);
-      }
+    // 2. 根据类型获取数据
+    if (type === "all") {
+        // 混合模式：同时请求电影和剧集
+        const [movies, shows] = await Promise.all([
+            fetchTraktData(clientId, "movies", sort, region, page),
+            fetchTraktData(clientId, "shows", sort, region, page)
+        ]);
+        // 简单的穿插合并，避免前20个全是电影
+        rawItems = [];
+        const maxLen = Math.max(movies.length, shows.length);
+        for (let i = 0; i < maxLen; i++) {
+            if (movies[i]) rawItems.push(movies[i]);
+            if (shows[i]) rawItems.push(shows[i]);
+        }
     } else {
-      allItems = results.flat();
+        // 单一模式
+        rawItems = await fetchTraktData(clientId, type, sort, region, page);
     }
 
-    if (allItems.length === 0) {
-      if (page > 1) return [{ title: "没有更多内容了", type: "text" }];
-      return [{ title: "列表为空", subTitle: "请检查网络连接", type: "text" }];
+    if (!rawItems || rawItems.length === 0) {
+        return page === 1 ? [{ id: "empty", type: "text", title: "列表为空或加载失败" }] : [];
     }
 
-    return allItems;
+    // 3. 核心：使用 Widget.tmdb 补全中文信息
+    // 这一步是把你原本只有英文的 Trakt 数据，转换成带图、带中文标题的卡片
+    const promises = rawItems.map(async (item) => {
+        // 提取主体 (Trakt 返回结构有多种，这里统一处理)
+        let subject = item.movie || item.show || item;
+        // 如果是 Popular 榜单，Trakt 直接返回 subject 对象，没有嵌套
+        if (!subject.ids && item.ids) subject = item;
 
-  } catch (e) {
-    return [{ title: "运行错误", subTitle: String(e.message), type: "text" }];
-  }
-}
+        if (!subject?.ids?.tmdb) return null;
 
-// ===========================
-// 网络请求
-// ===========================
+        // 确定类型 (Trakt 数据里有时不带 type 字段，需要根据上下文判断)
+        // 我们的 fetchTraktData 会预埋 type 标记，或者通过 ids 结构猜测
+        let mediaType = "movie";
+        if (subject.season || item.show || (type === "shows") || (type==="all" && item._type === "show")) {
+            mediaType = "tv";
+        }
 
-async function fetchTrakt(mediaType, sort, region, page) {
-  let url = `${API_BASE}/${mediaType}/${sort}?limit=20&page=${page}&extended=full`;
-  if (region && region !== "global") {
-    url += `&countries=${region}`;
-  }
-
-  try {
-    const res = await Widget.http.get(url, {
-      headers: {
-        "Content-Type": "application/json",
-        "trakt-api-version": "2",
-        "trakt-api-key": TRAKT_CLIENT_ID
-      }
+        // 构造副标题 (热度数据)
+        let subInfo = "";
+        if (item.watchers) subInfo = `🔥 ${item.watchers} 人在看`;
+        else if (item.watcher_count) subInfo = `👁️ ${item.watcher_count} 观看`;
+        else if (item.list_count) subInfo = `❤️ ${item.list_count} 收藏`;
+        else subInfo = mediaType === "tv" ? "热门剧集" : "热门电影";
+        
+        // 调用 TMDB 获取详情 (复用你那个好用的逻辑)
+        return await fetchTmdbDetail(subject.ids.tmdb, mediaType, subInfo, subject.title);
     });
 
-    const data = JSON.parse(res.body || res.data);
-    if (!Array.isArray(data)) return [];
+    return (await Promise.all(promises)).filter(Boolean);
+}
 
-    return data.map(item => {
-      // 1. 确定类型名称
-      const typeLabel = mediaType === "movies" ? "电影" : "剧集";
+// ==========================================
+// 2. 数据获取层 (Trakt)
+// ==========================================
 
-      // 2. 提取主体数据
-      let subject = null;
-      const singularKey = mediaType === "movies" ? "movie" : "show";
-      
-      if (item[singularKey]) {
-        subject = item[singularKey];
-      } else if (item.ids) {
-        subject = item;
-      }
-
-      // 3. 过滤无效数据
-      if (!subject || !subject.ids || !subject.ids.tmdb) return null;
-
-      // 4. 格式化日期
-      let dateStr = "待定";
-      const rawDate = subject.released || subject.first_aired || subject.year;
-      if (rawDate) {
-         dateStr = String(rawDate).substring(0, 10);
-      }
-      
-      const subTitleText = `[${typeLabel}] 📅 ${dateStr}`;
-
-      return {
-        id: `trakt_${mediaType}_${subject.ids.tmdb}`,
-        type: "tmdb",
-        tmdbId: parseInt(subject.ids.tmdb), // 强制转数字
-        mediaType: mediaType === "movies" ? "movie" : "tv",
-        title: subject.title,
-        subTitle: subTitleText,
-        description: subject.overview || "",
-        posterPath: "" 
-      };
-    }).filter(Boolean);
+async function fetchTraktData(clientId, mediaType, sort, region, page) {
+    // 构造 URL
+    // https://api.trakt.tv/shows/trending?limit=20&page=1
+    let url = `${API_BASE}/${mediaType}/${sort}?limit=20&page=${page}`;
     
-  } catch (e) {
-    console.log("Error: " + e.message);
-    return [];
-  }
+    // 地区参数 (仅 trending/popular/anticipated 支持)
+    if (region && region !== "global") {
+        url += `&countries=${region}`;
+    }
+
+    try {
+        const res = await Widget.http.get(url, {
+            headers: {
+                "Content-Type": "application/json",
+                "trakt-api-version": "2",
+                "trakt-api-key": clientId
+            }
+        });
+        
+        const data = res.data || JSON.parse(res.body || "[]");
+        if (!Array.isArray(data)) return [];
+        
+        // 预处理：给数据打上类型标签，方便混合排序时识别
+        return data.map(d => {
+            // 如果是对象，浅拷贝一份并标记类型
+            // mediaType 传入的是 "movies" 或 "shows"
+            if (typeof d === 'object') {
+                d._type = (mediaType === "shows") ? "show" : "movie";
+            }
+            return d;
+        });
+
+    } catch (e) {
+        console.log("Trakt Error: " + e.message);
+        return [];
+    }
+}
+
+// ==========================================
+// 3. 数据补全层 (TMDB - 借用你的逻辑)
+// ==========================================
+
+async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
+    try {
+        // 使用 Widget.tmdb 自动处理中文参数
+        const d = await Widget.tmdb.get(`/${type}/${id}`, { params: { language: "zh-CN" } });
+        
+        // 获取年份
+        const dateStr = d.first_air_date || d.release_date || "";
+        const year = dateStr.substring(0, 4);
+        
+        // 组合副标题：[电影] 2023 • 🔥 500人在看
+        const typeLabel = type === "tv" ? "剧集" : "电影";
+        const finalSub = `[${typeLabel}] ${year} • ${subInfo}`;
+
+        return {
+            id: `trakt_${type}_${d.id}`, 
+            tmdbId: d.id, 
+            type: "tmdb", 
+            mediaType: type,
+            title: d.name || d.title || originalTitle, // 优先用中文名
+            subTitle: finalSub, 
+            genreTitle: year, // 列表右侧显示年份
+            description: d.overview,
+            posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : ""
+        };
+    } catch (e) {
+        // 如果 TMDB 失败，回退到纯文本显示 (防止整行消失)
+        return {
+            id: `err_${id}`,
+            title: originalTitle,
+            subTitle: subInfo + " (无中文详情)",
+            type: "text"
+        };
+    }
 }
