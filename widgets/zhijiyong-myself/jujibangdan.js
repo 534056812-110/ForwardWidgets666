@@ -1,5 +1,5 @@
 WidgetMetadata = {
-  id: "trakt_global_litv3",
+  id: "trakt_globa",
   title: "全球剧集榜单 (精简版)",
   author: "Makkapakka",
   description: "内置Trakt源。支持分页、自动显示日期、自动匹配资源。",
