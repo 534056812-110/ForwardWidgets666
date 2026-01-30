@@ -1,13 +1,13 @@
 WidgetMetadata = {
-    id: "trakt_global_remix_v3",
-    title: "Trakt 全球影视 (V3重制版)",
+    id: "trakt_global_region_fix_v3_1",
+    title: "Trakt 全球影视 (地区修复版)",
     author: "Makkapakka",
-    description: "V3.0: 采用'先抓热榜-后查时间-本地排序'新逻辑。修复日历无数据问题，支持按最新集更新排序。",
-    version: "3.0.0",
+    description: "v3.1: 修复韩剧/日剧榜单混入美剧的问题。新增【地区过滤】，支持强制锁定特定国家内容。",
+    version: "3.1.0",
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
-    globalParams: [], // 内置 Key，无需输入
+    globalParams: [], 
 
     modules: [
         {
@@ -17,14 +17,29 @@ WidgetMetadata = {
             cacheDuration: 3600, 
             params: [
                 {
+                    name: "region",
+                    title: "🌏 地区过滤 (关键)",
+                    type: "enumeration",
+                    defaultValue: "global",
+                    enumOptions: [
+                        { title: "🌍 全球 (不过滤)", value: "global" },
+                        { title: "🇨🇳 中国大陆 (国产剧)", value: "cn" },
+                        { title: "🇰🇷 韩国 (韩剧/韩影)", value: "kr" },
+                        { title: "🇺🇸 美国 (美剧/好莱坞)", value: "us" },
+                        { title: "🇯🇵 日本 (日剧/番剧)", value: "jp" },
+                        { title: "🇬🇧 英国 (英剧)", value: "gb" },
+                        { title: "🇭🇰 中国香港", value: "hk" }
+                    ]
+                },
+                {
                     name: "sort",
                     title: "排序模式",
                     type: "enumeration",
                     defaultValue: "trending",
                     enumOptions: [
                         { title: "🔥 默认热度 (Trending)", value: "trending" },
-                        { title: "📅 按最新集更新 (Latest Ep)", value: "update_date" },
-                        { title: "🆕 按首播/上映 (Premieres)", value: "release_date" }
+                        { title: "📅 按最新集更新 (追更)", value: "update_date" },
+                        { title: "🆕 按首播/上映 (新片)", value: "release_date" }
                     ]
                 },
                 {
@@ -34,243 +49,236 @@ WidgetMetadata = {
                     defaultValue: "shows",
                     enumOptions: [
                         { title: "📺 剧集", value: "shows" },
-                        { title: "🎬 电影", value: "movies" },
-                        { title: "♾️ 混合展示", value: "all" }
+                        { title: "🎬 电影", value: "movies" }
                     ]
-                },
-                {
-                    name: "region",
-                    title: "地区筛选",
-                    type: "enumeration",
-                    defaultValue: "global",
-                    enumOptions: [
-                        { title: "🌍 全球 (Global)", value: "global" },
-                        { title: "🇺🇸 美剧 (US)", value: "us" },
-                        { title: "🇨🇳 国产 (CN)", value: "cn" },
-                        { title: "🇰🇷 韩剧 (KR)", value: "kr" },
-                        { title: "🇯🇵 日剧 (JP)", value: "jp" },
-                        { title: "🇭🇰 港剧 (HK)", value: "hk" },
-                        { title: "🇬🇧 英剧 (GB)", value: "gb" }
-                    ]
-                },
-                { name: "page", title: "页码", type: "page", value: "1" }
+                }
             ]
         }
     ]
 };
 
 // ==========================================
-// 0. 常量与工具
+// 0. 核心配置
 // ==========================================
 
-const CLIENT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e37cb45cb482";
-const API_BASE = "https://api.trakt.tv";
-
-// 格式化日期 2023-10-24 -> 10-24
-function formatShortDate(dateStr) {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return "";
-    const m = (date.getMonth() + 1).toString().padStart(2, '0');
-    const d = date.getDate().toString().padStart(2, '0');
-    return `${m}-${d}`;
-}
+const TRAKT_CLIENT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e37cb45cb482";
+const TRAKT_API_BASE = "https://api.trakt.tv";
 
 // ==========================================
-// 1. 主逻辑 (你的思路实现)
+// 1. 主入口
 // ==========================================
 
 async function loadRankingsRemix(params = {}) {
+    const sortMode = params.sort || "trending";
     const type = params.type || "shows";
-    const sort = params.sort || "trending"; // trending, update_date, release_date
-    const region = params.region || "global";
-    const page = parseInt(params.page) || 1;
+    const region = params.region || "global"; // 新增地区参数
 
-    // 1. 获取源数据
-    // 无论选什么排序，我们都先从 Trakt 抓取"Trending"（正在热播）的数据
-    // 因为这些剧才有更新的价值。抓取数量稍微多一点(比如40个)，方便本地排序。
-    let rawTraktItems = [];
+    // 1. 从 Trakt 获取原始列表 (带地区过滤)
+    const rawItems = await fetchTraktRankings(type, sortMode, region);
     
-    // 为了支持本地排序效果好，如果是日期排序，我们一次性抓多一点数据(limit=50)，忽略 Trakt 分页
-    // 如果是默认排序，则正常分页
-    const fetchLimit = (sort === "update_date" || sort === "release_date") ? 50 : 20;
-    const fetchPage = (sort === "update_date" || sort === "release_date") ? 1 : page;
-
-    if (type === "all") {
-        const [movies, shows] = await Promise.all([
-            fetchTraktTrending("movies", region, fetchPage, fetchLimit),
-            fetchTraktTrending("shows", region, fetchPage, fetchLimit)
-        ]);
-        rawTraktItems = [...shows, ...movies];
-    } else {
-        rawTraktItems = await fetchTraktTrending(type, region, fetchPage, fetchLimit);
+    if (!rawItems || rawItems.length === 0) {
+        return [{ title: "列表为空", subTitle: "Trakt 未返回数据或该分类无内容", type: "text" }];
     }
 
-    if (!rawTraktItems || rawTraktItems.length === 0) {
-        return [{ id: "empty", type: "text", title: "暂无数据", subTitle: "请尝试切换筛选条件" }];
-    }
-
-    // 2. 数据补全 (查询 TMDB 详情，获取关键日期)
-    const enrichedItems = await Promise.all(rawTraktItems.map(async (item) => {
-        let subject = item.movie || item.show || item;
-        if (!subject?.ids?.tmdb) return null;
-
-        // 确定类型
-        let mediaType = "movie";
-        if (item.show || type === "shows" || item._type === "show") mediaType = "tv";
-
-        // 去 TMDB 查详情 (包含最新一集时间、首播时间、高清图)
-        const tmdbData = await fetchTmdbDetail(subject.ids.tmdb, mediaType);
-        if (!tmdbData) return null;
-
-        return {
-            trakt: item,
-            tmdb: tmdbData,
-            // 提取关键排序字段
-            lastAirDate: tmdbData.last_air_date || "1900-01-01", // 最新一集
-            releaseDate: tmdbData.release_date || "1900-01-01", // 首播/上映
-            mediaType: mediaType
-        };
+    // 2. 并发查询 TMDB 详情 (获取中文名、图片、具体集数时间)
+    // 限制处理数量，防止卡顿
+    const itemsToProcess = rawItems.slice(0, 20);
+    
+    const enrichedItems = await Promise.all(itemsToProcess.map(async (item) => {
+        return await enrichItem(item, type);
     }));
 
     // 过滤无效项
     let validItems = enrichedItems.filter(Boolean);
 
-    // 3. 本地排序 (你的核心需求)
-    if (sort === "update_date") {
-        // 按最新一集播出时间倒序 (今天 -> 昨天 -> 前天)
-        validItems.sort((a, b) => new Date(b.lastAirDate) - new Date(a.lastAirDate));
-    } else if (sort === "release_date") {
-        // 按首播/上映时间倒序 (最新出的剧/片在前面)
-        validItems.sort((a, b) => new Date(b.releaseDate) - new Date(a.releaseDate));
-    }
-    // 如果是 trending，保持 Trakt 原序，无需操作
-
-    // 4. 处理分页 (如果是本地排序模式，需要手动切片)
-    if (sort === "update_date" || sort === "release_date") {
-        const start = (page - 1) * 20;
-        validItems = validItems.slice(start, start + 20);
+    // 3. 本地二次排序 (如果用户选择了“按更新时间”)
+    // 只有在数据全部拿到后，才能按精确的“播出时间”排序
+    if (sortMode === "update_date") {
+        validItems.sort((a, b) => {
+            // 优先按 sortDate (下一集或最新集) 倒序
+            return new Date(b.sortDate).getTime() - new Date(a.sortDate).getTime();
+        });
+    } else if (sortMode === "release_date") {
+        validItems.sort((a, b) => {
+            return new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime();
+        });
     }
 
-    // 5. 生成最终卡片
-    return validItems.map(item => buildCard(item, sort));
+    // 4. 生成卡片
+    return validItems.map(item => buildCard(item, sortMode));
 }
 
 // ==========================================
-// 2. 数据获取层
+// 2. Trakt 列表获取 (核心修复点)
 // ==========================================
 
-async function fetchTraktTrending(mediaType, region, page, limit) {
-    // 始终使用 trending 接口作为数据源，保证列表里都是"活"的剧
-    let url = `${API_BASE}/${mediaType}/trending?limit=${limit}&page=${page}`;
+async function fetchTraktRankings(type, sortMode, region) {
+    // 映射: 如果是 update_date，Trakt 并没有直接的接口，我们通常用 trending 取回来再本地排
+    // 或者使用 anticipated (期待)
+    let traktEndpoint = "trending"; 
+    if (sortMode === "release_date") traktEndpoint = "anticipated"; 
     
-    // 地区 + 语言过滤
-    let params = [];
+    // 构建 URL
+    let url = `${TRAKT_API_BASE}/${type}/${traktEndpoint}?extended=full&limit=30&page=1`;
+    
+    // ✅ 关键修复：加上地区参数
+    // Trakt API: ?countries=kr
     if (region && region !== "global") {
-        params.push(`countries=${region}`);
-        if (["cn", "hk", "tw"].includes(region)) params.push(`languages=zh`);
+        url += `&countries=${region}`;
     }
-    if (params.length > 0) url += "&" + params.join("&");
 
     try {
         const res = await Widget.http.get(url, {
-            headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": CLIENT_ID }
+            headers: {
+                "Content-Type": "application/json",
+                "trakt-api-version": "2",
+                "trakt-api-key": TRAKT_CLIENT_ID
+            }
         });
-        const data = res.data || JSON.parse(res.body || "[]");
-        return Array.isArray(data) ? data.map(d => ({ ...d, _type: mediaType === "shows" ? "show" : "movie" })) : [];
-    } catch (e) { return []; }
+        
+        let data = JSON.parse(res.body || res.data);
+        // Trakt trending 返回的是 [{ watchers: 10, show: {...} }] 结构
+        // anticipated 返回 [{ list_count: 10, show: {...} }]
+        // 我们需要统一提取里面的 show 或 movie 对象
+        return data.map(i => {
+            const mediaObj = i.show || i.movie;
+            return {
+                ...mediaObj,
+                _traktMeta: i // 保留外层数据(watchers等)
+            };
+        });
+    } catch (e) {
+        console.log("Trakt Fetch Error: " + e);
+        return [];
+    }
 }
 
-async function fetchTmdbDetail(id, type) {
+// ==========================================
+// 3. 数据增强 (TMDB + Trakt Time)
+// ==========================================
+
+async function enrichItem(traktItem, type) {
+    const tmdbId = traktItem.ids.tmdb;
+    const title = traktItem.title;
+    const year = traktItem.year;
+
     try {
-        // 获取中文详情
-        const d = await Widget.tmdb.get(`/${type}/${id}`, { params: { language: "zh-CN" } });
+        // A. 获取 TMDB 中文信息 (ID和图片)
+        // 直接用 TMDB ID 查详情，比搜索更准
+        const tmdbUrl = type === "shows" 
+            ? `https://api.themoviedb.org/3/tv/${tmdbId}?api_key=2a818c9927d8122a27b87870a30b2067&language=zh-CN`
+            : `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=2a818c9927d8122a27b87870a30b2067&language=zh-CN`;
         
-        // 提取排序所需的关键日期
-        let last_air = "";
-        let release = d.first_air_date || d.release_date || ""; // 剧集首播 or 电影上映
+        const tmdbRes = await Widget.http.get(tmdbUrl);
+        const tmdbData = JSON.parse(tmdbRes.body || tmdbRes.data);
+        
+        if (!tmdbData.id) return null; // 没查到
 
-        let next_ep_info = null;
-        let last_ep_info = null;
+        // B. 获取精准时间 (如果是剧集且需要按更新排序)
+        let sortDate = "1900-01-01";
+        let nextEp = null;
+        let lastEp = null;
+        let status = traktItem.status; // Trakt 里的状态 usually accurate
 
-        if (type === "tv") {
-            // 剧集特有逻辑：找最新一集
-            if (d.next_episode_to_air) {
-                // 如果有下一集，记录下来
-                next_ep_info = d.next_episode_to_air;
-            }
-            if (d.last_episode_to_air) {
-                last_ep_info = d.last_episode_to_air;
-                last_air = d.last_episode_to_air.air_date; // 用最后一集的时间作为"更新时间"
+        if (type === "shows") {
+            // 直接利用 TMDB 详情里的 last_episode_to_air 和 next_episode_to_air
+            // 这是 TMDB 最好用的地方，不用发额外请求
+            if (tmdbData.next_episode_to_air) {
+                nextEp = tmdbData.next_episode_to_air;
+                sortDate = nextEp.air_date;
+            } else if (tmdbData.last_episode_to_air) {
+                lastEp = tmdbData.last_episode_to_air;
+                sortDate = lastEp.air_date;
             } else {
-                last_air = release; // 如果没有最后一集信息，用首播代替
+                sortDate = tmdbData.first_air_date;
             }
         } else {
-            // 电影
-            last_air = release;
+            sortDate = tmdbData.release_date;
         }
 
         return {
-            ...d,
-            last_air_date: last_air,
-            release_date: release,
-            next_ep: next_ep_info,
-            last_ep: last_ep_info
+            tmdb: tmdbData,
+            trakt: traktItem,
+            mediaType: type === "shows" ? "tv" : "movie",
+            sortDate: sortDate || "1900-01-01",
+            releaseDate: (tmdbData.first_air_date || tmdbData.release_date || "1900-01-01"),
+            nextEp: nextEp,
+            lastEp: lastEp
         };
-    } catch (e) { return null; }
+
+    } catch (e) {
+        return null; // 出错就跳过
+    }
 }
 
 // ==========================================
-// 3. 卡片构建
+// 4. 卡片 UI
 // ==========================================
 
 function buildCard(item, sortMode) {
-    const tmdb = item.tmdb;
+    const d = item.tmdb;
     const typeLabel = item.mediaType === "tv" ? "剧" : "影";
     
-    // 🖼️ 图片策略：优先高清横图
+    // 图片
     let imagePath = "";
-    if (tmdb.backdrop_path) imagePath = `https://image.tmdb.org/t/p/w780${tmdb.backdrop_path}`;
-    else if (tmdb.poster_path) imagePath = `https://image.tmdb.org/t/p/w500${tmdb.poster_path}`;
+    if (d.backdrop_path) imagePath = `https://image.tmdb.org/t/p/w780${d.backdrop_path}`;
+    else if (d.poster_path) imagePath = `https://image.tmdb.org/t/p/w500${d.poster_path}`;
 
-    // 📝 副标题与右侧信息逻辑
+    // 格式化日期
+    const formatDate = (str) => {
+        if (!str || str.startsWith("1900")) return "";
+        const date = new Date(str);
+        if (isNaN(date.getTime())) return "";
+        const m = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${m}-${day}`;
+    };
+
     let subTitle = "";
-    let genreTitle = ""; // 右侧信息
+    let genreTitle = ""; 
 
     if (sortMode === "update_date" && item.mediaType === "tv") {
-        // 更新模式：显示 S01E05 • 10-24
-        const ep = tmdb.next_ep || tmdb.last_ep;
-        const icon = tmdb.next_ep ? "🔜" : "📅";
-        if (ep) {
-            const shortDate = formatShortDate(ep.air_date);
-            subTitle = `${icon} ${shortDate} 更新 S${ep.season_number}E${ep.episode_number}`;
-            genreTitle = shortDate; // 右侧也显示日期，一目了然
+        // 更新模式
+        if (item.nextEp) {
+            const date = formatDate(item.nextEp.air_date);
+            subTitle = `🔜 ${date} 更新 S${item.nextEp.season_number}E${item.nextEp.episode_number}`;
+            genreTitle = date;
+        } else if (item.lastEp) {
+            const date = formatDate(item.lastEp.air_date);
+            if (d.status === "Ended" || d.status === "Canceled") {
+                 subTitle = `[${typeLabel}] 已完结`;
+                 genreTitle = "End";
+            } else {
+                 subTitle = `📅 ${date} 更新 S${item.lastEp.season_number}E${item.lastEp.episode_number}`;
+                 genreTitle = date;
+            }
         } else {
-            subTitle = `[${typeLabel}] 已完结`;
-            genreTitle = tmdb.status || "End";
+             subTitle = `[${typeLabel}] 暂无更新信息`;
+             genreTitle = formatDate(item.releaseDate);
         }
-    } else if (sortMode === "release_date") {
-        // 上映模式
-        const shortDate = formatShortDate(item.releaseDate);
-        subTitle = `🆕 ${shortDate} 上映`;
-        genreTitle = shortDate;
     } else {
-        // 默认热度模式
-        const year = (tmdb.release_date || "").substring(0, 4);
-        const watchers = item.trakt.watchers || item.trakt.watcher_count || 0;
-        subTitle = `[${typeLabel}] 🔥 ${watchers} 人在看`;
+        // 热度模式 或 上映模式
+        const year = (item.releaseDate || "").substring(0, 4);
+        subTitle = `🔥 Trakt 热度: ${item.trakt._traktMeta.watchers || "High"}`;
+        
+        if (item.mediaType === "tv" && item.nextEp) {
+             // 即使是热度模式，如果有下一集也提示一下
+             const date = formatDate(item.nextEp.air_date);
+             subTitle = `🔜 ${date} 更新 S${item.nextEp.season_number}E${item.nextEp.episode_number}`;
+        }
+        
         genreTitle = year;
     }
-
+    
     return {
-        id: `trakt_${item.mediaType}_${tmdb.id}`,
-        tmdbId: tmdb.id,
+        id: `trakt_${d.id}`,
+        tmdbId: d.id, 
         type: "tmdb",
         mediaType: item.mediaType,
-        title: tmdb.name || tmdb.title, // 中文名
+        title: d.name || d.title, // 优先用 TMDB 中文名
         subTitle: subTitle,
         genreTitle: genreTitle,
-        description: tmdb.overview,
+        description: d.overview,
         posterPath: imagePath
     };
 }
