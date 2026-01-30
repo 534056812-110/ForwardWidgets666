@@ -1,160 +1,218 @@
 WidgetMetadata = {
-  id: "twitch_local_direct",
-  title: "Twitch 直播 (本地直连)",
-  author: "Me",
-  description: "不依赖服务器，利用手机网络直接解析 Twitch 直播流。",
+  id: "live_clean_aggregate",
+  title: "聚合直播LIVE",
+  author: "Makkapakka",
+  description: "虎牙、B站、Twitch等直播。",
   version: "1.0.0",
   requiredVersion: "0.0.1",
-  site: "https://twitch.tv",
+  site: "https://m.iill.top",
   
-  // 这里配置你想看的默认主播列表
-  globalParams: [
-      { 
-          name: "defaultChannels", 
-          title: "默认主播ID (逗号分隔)", 
-          type: "input", 
-          value: "shroud,tarik,tenz,zneptunelive,seoi1016,fps_shaka,uzi" 
-      }
-  ],
-
   modules: [
     {
-      title: "我的关注",
-      functionName: "loadFollowedChannels",
-      type: "list",
-      cacheDuration: 0, // 直播不缓存
+      title: "精选频道",
+      description: "自动分类：虎牙 / B站 / Twitch",
+      requiresWebView: false,
+      functionName: "loadFeaturedChannels",
+      type: "list", 
+      cacheDuration: 300, // 缓存5分钟
       params: []
     },
     {
-        title: "搜索主播",
-        functionName: "searchStreamer",
-        type: "list",
-        params: [
-            { name: "channelId", title: "主播ID (如 shroud)", type: "input", value: "" }
-        ]
+      title: "自定义筛选",
+      description: "输入关键词查找频道",
+      requiresWebView: false,
+      functionName: "searchChannels",
+      type: "list",
+      params: [
+        {
+          name: "keyword",
+          title: "关键词",
+          type: "input",
+          description: "例如：电影、音乐、周杰伦",
+          value: ""
+        }
+      ]
     }
   ]
 };
 
 // ===========================
-// 主逻辑
+// 配置区域
 // ===========================
 
-// 1. 加载默认列表
-async function loadFollowedChannels(params) {
-    const defaultStr = params.defaultChannels || "shroud,tarik,tenz";
-    const channels = defaultStr.split(",").map(s => s.trim()).filter(Boolean);
-    
-    // 并发获取所有频道状态
-    const promises = channels.map(id => getStreamItem(id));
-    const results = await Promise.all(promises);
-    
-    // 过滤掉完全错误的，保留在线和离线的（离线显示为灰色或提示）
-    return results.filter(item => item !== null);
-}
+const M3U_SOURCE = "https://m.iill.top/Live.m3u";
 
-// 2. 搜索单个主播
-async function searchStreamer(params) {
-    if (!params.channelId) return [{ title: "请输入主播 ID", type: "text" }];
-    const item = await getStreamItem(params.channelId);
-    return item ? [item] : [{ title: "未找到频道或解析失败", type: "text" }];
-}
+// 🚫 需要屏蔽的分组名称 (完全匹配或包含)
+const BLOCKED_GROUPS = [
+  "免費訂閱", 
+  "維護時間", 
+  "維護內容", 
+  "公告說明",
+  "作者",
+  "更新"
+];
 
 // ===========================
-// 核心解析函数
+// 核心逻辑
 // ===========================
 
-async function getStreamItem(channelId) {
-    const channel = channelId.toLowerCase();
-    
-    try {
-        // 1. 构造请求获取 Token
-        // 使用 Android TV Client ID，抗封锁能力最强
-        const clientId = "kd1unb4r3yd4jf6tbze5f7h6j197mw";
-        
-        const gqlQuery = {
-            operationName: "PlaybackAccessToken",
-            variables: {
-                isLive: true,
-                login: channel,
-                isVod: false,
-                vodID: "",
-                playerType: "frontpage"
-            },
-            extensions: {
-                persistedQuery: {
-                    version: 1,
-                    sha256Hash: "0828119ded1c1347796643485968c200c26939681ef14ad046379208eb2477e3"
-                }
-            }
-        };
+// 1. 加载精选分类 (虎牙/B站/Twitch)
+async function loadFeaturedChannels() {
+  const allChannels = await fetchAndParseM3U();
+  
+  // 初始化容器
+  const sections = [
+    { title: "🐯 虎牙直播", items: [] },
+    { title: "📺 哔哩哔哩", items: [] },
+    { title: "👾 Twitch", items: [] }
+  ];
 
-        const res = await Widget.http.post("https://gql.twitch.tv/gql", {
-            headers: {
-                "Client-ID": clientId,
-                "Content-Type": "application/json",
-                "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 9; SHIELD Android TV Build/PPR1.180610.011)"
-            },
-            body: JSON.stringify(gqlQuery)
-        });
+  // 遍历所有频道进行归类
+  for (const channel of allChannels) {
+    const name = channel.title.toLowerCase();
+    const group = (channel.group || "").toLowerCase();
 
-        // 检查 Token
-        const data = res.data || JSON.parse(res.body); // 兼容不同版本的 HTTP 库
-        const accessToken = data.data?.streamPlaybackAccessToken;
-
-        // 构造基础 UI 信息
-        const baseItem = {
-            title: channel.toUpperCase(),
-            subTitle: "检测中...",
-            // 封面图使用 Twitch 缓存图
-            posterPath: `https://static-cdn.jtvnw.net/previews-ttv/live_user_${channel}-640x360.jpg?t=${Date.now()}`, 
-            type: "tmdb", // 借用样式
-            mediaType: "tv"
-        };
-
-        if (!accessToken) {
-            // 频道可能被封禁或 ID 错误
-            baseItem.subTitle = "❌ 频道不存在";
-            return baseItem;
-        }
-
-        const token = accessToken.value;
-        const sig = accessToken.signature;
-
-        if (!token || !sig) {
-            // 离线状态（Twitch 不会给离线频道发 Token，或者返回 null）
-            baseItem.subTitle = "⚫ 离线 (Offline)";
-            // 也可以选择不返回离线主播： return null; 
-            return baseItem; 
-        }
-
-        // 2. 构造最终播放链接
-        const streamUrl = `https://usher.ttvnw.net/api/channel/hls/${channel}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=false&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${sig}&token=${encodeURIComponent(token)}`;
-
-        // 3. 返回可播放对象
-        return {
-            id: channel,
-            title: channel.toUpperCase(),
-            subTitle: "🔴 直播中 (点击播放)",
-            genreTitle: "Twitch Live",
-            description: "点击即可直接播放。如果无法播放，请检查 VPN 连接。",
-            posterPath: baseItem.posterPath,
-            videoUrl: streamUrl, // Forward 识别此字段播放
-            type: "tmdb", // 使用美观的卡片布局
-            mediaType: "tv",
-            playerType: "system", // 调用系统播放器
-            headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-                "Referer": "https://www.twitch.tv/"
-            }
-        };
-
-    } catch (e) {
-        return {
-            title: channel,
-            subTitle: "⚠️ 解析错误",
-            description: e.message,
-            type: "text"
-        };
+    // 虎牙判断
+    if (name.includes("虎牙") || group.includes("虎牙") || name.includes("huya")) {
+      sections[0].items.push(channel);
+      continue;
     }
+
+    // B站判断
+    if (name.includes("bilibili") || name.includes("b站") || name.includes("哔哩") || group.includes("bilibili")) {
+      sections[1].items.push(channel);
+      continue;
+    }
+
+    // Twitch判断
+    if (name.includes("twitch") || group.includes("twitch")) {
+      sections[2].items.push(channel);
+      continue;
+    }
+  }
+
+  // 过滤掉空的分组并构建返回格式
+  const result = [];
+  for (const sec of sections) {
+    if (sec.items.length > 0) {
+      result.push({
+        title: `${sec.title} (${sec.items.length})`,
+        type: "section", // 或者直接用 section 结构
+        childItems: sec.items
+      });
+    }
+  }
+  
+  // Forward 格式兼容：如果使用了 section 结构，直接返回数组即可
+  // 如果 Forward 版本需要打平，可以在这里调整，通常 sections 结构是支持的
+  return result.map(sec => ({
+      title: sec.title,
+      childItems: sec.childItems
+  }));
+}
+
+// 2. 自定义关键词搜索
+async function searchChannels(params) {
+  const keyword = (params.keyword || "").trim().toLowerCase();
+  if (!keyword) {
+    return [{ title: "请输入关键词", type: "text" }];
+  }
+
+  const allChannels = await fetchAndParseM3U();
+  const results = allChannels.filter(ch => 
+    ch.title.toLowerCase().includes(keyword) || 
+    (ch.group && ch.group.toLowerCase().includes(keyword))
+  );
+
+  if (results.length === 0) {
+    return [{ title: "未找到相关频道", type: "text" }];
+  }
+
+  return [{
+      title: `"${params.keyword}" 的搜索结果 (${results.length})`,
+      childItems: results
+  }];
+}
+
+// ===========================
+// 工具函数：下载并解析 M3U
+// ===========================
+
+async function fetchAndParseM3U() {
+  try {
+    const res = await Widget.http.get(M3U_SOURCE);
+    const text = res.body || res.data; // 兼容不同版本
+    return parseM3U(text);
+  } catch (e) {
+    return [{ title: "获取源失败", subTitle: e.message, type: "text" }];
+  }
+}
+
+function parseM3U(content) {
+  const lines = content.split('\n');
+  const channels = [];
+  let currentInfo = null;
+
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) continue;
+
+    if (line.startsWith("#EXTINF:")) {
+      // 解析信息行
+      // 示例: #EXTINF:-1 tvg-logo="..." group-title="虎牙", 频道名
+      
+      // 1. 提取分组 (group-title)
+      let group = "";
+      const groupMatch = line.match(/group-title="([^"]*)"/);
+      if (groupMatch) group = groupMatch[1];
+
+      // 🛑 核心过滤：如果在屏蔽名单里，直接跳过
+      if (isBlocked(group)) {
+        currentInfo = null; // 标记为忽略
+        continue;
+      }
+
+      // 2. 提取 Logo
+      let logo = "";
+      const logoMatch = line.match(/tvg-logo="([^"]*)"/);
+      if (logoMatch) logo = logoMatch[1];
+
+      // 3. 提取名称 (逗号后面的部分)
+      const nameParts = line.split(",");
+      const title = nameParts[nameParts.length - 1].trim();
+
+      currentInfo = {
+        title: title,
+        group: group,
+        posterPath: logo
+      };
+
+    } else if (!line.startsWith("#")) {
+      // 这是链接行
+      if (currentInfo) {
+        channels.push({
+          id: line, //以此链接为ID
+          title: currentInfo.title,
+          subTitle: currentInfo.group || "直播频道",
+          posterPath: currentInfo.posterPath,
+          videoUrl: line,
+          group: currentInfo.group,
+          type: "tmdb", // 使用美观的卡片样式
+          mediaType: "tv",
+          playerType: "system"
+        });
+        currentInfo = null; // 重置
+      }
+    }
+  }
+  return channels;
+}
+
+// 检查是否在屏蔽名单中
+function isBlocked(groupName) {
+  if (!groupName) return false;
+  for (const block of BLOCKED_GROUPS) {
+    if (groupName.includes(block)) return true;
+  }
+  return false;
 }
