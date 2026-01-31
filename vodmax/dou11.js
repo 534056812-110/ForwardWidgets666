@@ -1,99 +1,97 @@
 /**
- * 动态 UI 示例模块
- * 参考“热门精选.js”实现的横竖版副标题切换逻辑
+ * 演示：动态副标题逻辑
+ * 首页：横版 (16:9) -> "2026 · 科幻"
+ * 榜单：竖版 (3:4) -> "2026-01-31"
  */
-WidgetMetadata = {
-  id: "dynamic_ui_demo",
-  title: "动态副标题示例",
+
+// 1. 定义常量以防未定义错误
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+var WidgetMetadata = {
+  id: "dynamic_subtitle_pro",
+  title: "动态 UI 演示",
   author: "Gemini",
-  version: "1.0.0",
+  version: "1.0.1",
+  requiredVersion: "0.0.1",
   
   modules: [
     {
-      title: "今日推荐 (横版)",
-      functionName: "loadHomeData",
-      type: "video" // 默认 UI
+      title: "首页精选 (横版)",
+      functionName: "loadHome",
+      type: "video"
     },
     {
       title: "热播榜单 (竖版)",
-      functionName: "loadRankingData",
+      functionName: "loadRank",
       type: "video"
     }
   ]
 };
 
-/**
- * 首页数据 - 对应横版 UI
- */
-async function loadHomeData(params) {
-  const data = await fetchMockData();
-  // 强制指定为横版比例，并按“年份 · 类型”处理副标题
-  return parseItems(data, 1.77);
+// --- 模块入口 ---
+
+async function loadHome(params) {
+  // 模拟从某个接口获取数据
+  const list = getMockData();
+  // 传入 1.77 触发 "年份 · 类型" 副标题
+  return formatVideoList(list, 1.77);
 }
 
-/**
- * 榜单数据 - 对应竖版 UI
- */
-async function loadRankingData(params) {
-  const data = await fetchMockData();
-  // 强制指定为竖版比例，并按“完整日期”处理副标题
-  return parseItems(data, 0.75);
+async function loadRank(params) {
+  const list = getMockData();
+  // 传入 0.75 触发 "具体年月日" 副标题
+  return formatVideoList(list, 0.75);
 }
 
-/**
- * 核心解析函数 (参考你的逻辑)
- * @param {Array} items 原始数据
- * @param {Number} ratio 目标比例
- */
-function parseItems(items, ratio) {
-  return items.map(item => {
-    const dateObj = new Date(item.pubDate);
-    const year = dateObj.getFullYear();
-    const fullDate = item.pubDate; // 2026-01-21
-    const genre = item.category || "影视";
+// --- 核心格式化逻辑 (参考热门精选.js) ---
 
-    // 关键逻辑：根据 ratio 判断副标题格式
-    let subTitle = "";
-    if (ratio > 1) { 
-      // 横版：2026 · 科幻
-      subTitle = `${year} · ${genre}`;
+function formatVideoList(data, ratio) {
+  if (!data || !Array.isArray(data)) return [];
+
+  return data.map(item => {
+    // 处理日期
+    const dateStr = item.date || "2026-01-01";
+    const year = dateStr.split('-')[0];
+    const category = item.type || "电影";
+
+    // 副标题切换逻辑
+    let displayDesc = "";
+    if (ratio > 1) {
+      // 横版布局：2026 · 科幻
+      displayDesc = `${year} · ${category}`;
     } else {
-      // 竖版：2026-01-21
-      subTitle = fullDate;
+      // 竖版布局：2026-01-31
+      displayDesc = dateStr;
     }
 
     return {
       id: item.id.toString(),
       title: item.title,
-      description: subTitle, // 这里的 description 对应 UI 上的副标题
-      coverUrl: item.img,
-      coverRatio: ratio,     // 设置比例
+      description: displayDesc, // 赋给副标题
+      coverUrl: item.cover,
+      coverRatio: ratio,
       type: "link",
-      link: item.url
+      link: "https://example.com/detail/" + item.id
     };
   });
 }
 
-/**
- * 模拟数据请求
- */
-async function fetchMockData() {
+// 模拟数据源
+function getMockData() {
   return [
     {
-      id: 101,
-      title: "流浪地球 3",
-      pubDate: "2026-01-21",
-      category: "科幻",
-      img: "https://p.pstatp.com/origin/1376d0001088661642236", // 示例图
-      url: "https://example.com/m/1"
+      id: "9527",
+      title: "星际穿越续作",
+      date: "2026-01-31",
+      type: "科幻",
+      cover: "https://p.pstatp.com/origin/1376d0001088661642236"
     },
     {
-      id: 102,
-      title: "异形：罗慕路斯",
-      pubDate: "2024-08-16",
-      category: "惊悚",
-      img: "https://p.pstatp.com/origin/137a60000bd962f3ec051",
-      url: "https://example.com/m/2"
+      id: "9528",
+      title: "最后的人类",
+      date: "2026-02-15",
+      type: "剧情",
+      cover: "https://p.pstatp.com/origin/137a60000bd962f3ec051"
     }
   ];
 }
