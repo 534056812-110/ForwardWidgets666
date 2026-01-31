@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖's 𝙒𝙞𝙙𝙜𝙚𝙩𝙨</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #f8fafc; }
+        .widget-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .widget-card:hover { transform: translateY(-6px); shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+        .forward-gradient { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+    </style>
+</head>
+<body class="antialiased text-slate-800">
+
+    <div class="fixed top-0 left-0 w-full h-64 forward-gradient -z-10"></div>
+
+    <div class="max-w-5xl mx-auto px-4 py-12">
+        <header class="text-center mb-16 text-white">
+            <img src="https://github.com/MakkaPakka518/ForwardWidgets/raw/main/makka.png" 
+                 class="w-24 h-24 rounded-full mx-auto mb-6 border-4 border-white/20 shadow-xl object-cover" alt="Avatar">
+            <h1 class="text-4xl font-extrabold tracking-tight mb-3">𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖's 𝙒𝙞𝙙𝙜𝙚𝙩𝙨</h1>
+            <p class="text-blue-100 text-lg max-w-2xl mx-auto opacity-90">
+                汇聚追剧日历, 流媒体 Top 10, 烂番茄好评榜, 弹幕 API-Pro 等追剧神器
+            </p>
+        </header>
+
+        <div id="widget-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            </div>
+
+        <footer class="mt-20 text-center text-slate-400 text-sm border-t border-slate-200 pt-8">
+            <p>© 2026 𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖 • Powered by Forward</p>
+        </footer>
+    </div>
+
+    <script>
+        const config = {
+            title: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖's 𝙒𝙞𝙙𝙜𝙚𝙩𝙨",
+            forwardBase: "https://gocy.pages.dev/#forward://widget?url=",
+            widgets: [
+                {
+                    id: "anime_omni_fix",
+                    title: "二次元全境聚合",
+                    description: "一站式聚合多平台动漫榜单。",
+                    version: "2.2.4",
+                    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/animeone.js"
+                },
+                {
+                    id: "trakt_personal_key",
+                    title: "Trak 追剧日历 免key版",
+                    description: "内置 Key 版：只需填写用户名即可使用。显示追剧日历、待看、收藏及历史记录",
+                    version: "1.0.7",
+                    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/traktkey.js"
+                },
+                {
+                    id: "trakt_personal_mixed",
+                    title: "Trak 追剧日历&个人中心",
+                    description: "追剧日历:显示你观看剧集最新集的 更新时间&Trakt 待看/收藏/历史。",
+                    version: "1.0.7",
+                    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/traktlistpro.js"
+                },
+                {
+                    id: "variety_hub_ultimate_v4_fix",
+                    title: "全球综艺追更热度榜",
+                    description: "综艺更新时间表，热度榜",
+                    version: "2.0.3",
+                    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/danyi/zongyi.js"
+                },
+                {
+                    id: "western_trends_hub",
+                    title: "欧美风向标|口碑与热度",
+                    description: "聚合烂番茄(口碑)与流媒体平台(热度)，一站式掌握欧美影视动态。",
+                    version: "1.0.2",
+                    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/bangdan-one.js"
+                },
+                {
+                    id: "global_tv_calendar_ultimate",
+                    title: "全球追剧时刻表",
+                    description: "聚合全球剧集更新&综艺排期&bangumi动漫周更表。",
+                    version: "2.0.9",
+                    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/zhuijurili-one.js"
+                },
+                {
+                    id: "cinephile_hub_ultimate",
+                    title: "影迷宝藏 | 系列与流派",
+                    description: "聚合【系列电影大满贯】与【趣味流派探索】，一键补番，探索未知。",
+                    version: "1.0.3",
+                    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/movielist%26interesting.js"
+                },
+                {
+                    id: "discover_hub_ultimate",
+                    title: "探索发现 | 惊喜推荐",
+                    description: "聚合【今天看什么】、【Trakt惊喜推荐】与【那年今日】、一站式发现好片。",
+                    version: "1.0.4",
+                    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/today-one.js"
+                },
+                {
+                    id: "ultimate_media_hub_pro_ui",
+                    title: "全球影视 | 分流聚合",
+                    description: "集大成之作：Trakt/豆瓣/平台分流，全线支持【年份•类型】展示。",
+                    version: "1.2.1",
+                    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/cn-int-bangdan.js"
+                },
+                {
+                    id: "makka.platform.originals",
+                    title: "流媒体·独家原创（更新版）",
+                    description: "各平台独播剧更新时间表",
+                    version: "1.0.5",
+                    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/zhijiyong-myself/pingtai.js"
+                },
+                {
+                    id: "platform.originals.ui.fix",
+                    title: "流媒体·独家原创",
+                    description: "发现 Netflix/HBO/腾讯/B站等平台自制内容",
+                    version: "1.0.4",
+                    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/pingtaidujia.js"
+                },
+                {
+                    id: "forward.danmu.pro.online_dict",
+                    title: "多源弹幕 PRO",
+                    description: "支持添加多条 API 并自命名 & 繁简互转",
+                    version: "1.0.8",
+                    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/danmuapi-Pro.js"
+                }
+            ]
+        };
+
+        const grid = document.getElementById('widget-grid');
+
+        config.widgets.forEach(w => {
+            const importLink = config.forwardBase + encodeURIComponent(w.url);
+            
+            const card = `
+                <div class="widget-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col">
+                    <div class="flex-1">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="bg-blue-50 text-blue-600 p-2 rounded-lg">
+                                <i class="fa-solid fa-cube text-xl"></i>
+                            </div>
+                            <span class="text-[10px] font-bold py-1 px-2 bg-slate-100 text-slate-500 rounded-full">v${w.version}</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 mb-2">${w.title}</h3>
+                        <p class="text-slate-500 text-sm leading-relaxed mb-4 line-clamp-3">${w.description}</p>
+                    </div>
+                    <div class="pt-6 border-t border-slate-50">
+                        <a href="${importLink}" 
+                           class="flex items-center justify-center w-full bg-slate-900 hover:bg-blue-600 text-white font-semibold py-3 rounded-xl transition-all active:scale-95">
+                           <i class="fa-solid fa-plus-circle mr-2"></i> 导入 Forward
+                        </a>
+                    </div>
+                </div>
+            `;
+            grid.innerHTML += card;
+        });
+    </script>
+</body>
+</html>
