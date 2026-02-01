@@ -1,9 +1,9 @@
 WidgetMetadata = {
     id: "trakt_21987_key",
-    title: "Trak版",
+    title: "Trakt免key版",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    description: "内置 API Key 版：只需填写用户名即可使用看、收藏及历史记录。",
-    version: "1.0.8", // 版本号 +1
+    description: "内置 API Key 版：只需填写用户名追剧日历、待看、收藏及历史记录。",
+    version: "1.0.9", // 版本号 +1
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
@@ -26,7 +26,7 @@ WidgetMetadata = {
                     enumOptions: [
                         { title: "📅 追剧日历", value: "updates" },
                         { title: "📜 待看列表", value: "watchlist" },
-                        { title: "📦 收藏列表", value: "collection" }, // UI保持不变，内部映射为Likes
+                        { title: "📦 收藏列表", value: "collection" }, // UI 显示为收藏，实际获取 Favorites
                         { title: "🕒 观看历史", value: "history" }
                     ]
                 },
@@ -86,7 +86,7 @@ async function loadTraktProfile(params = {}) {
 
     // === B. 常规列表 ===
     let rawItems = [];
-    const sortType = "added,desc"; // 注意：Likes 接口忽略此参数，默认按添加时间倒序
+    const sortType = "added,desc"; 
     
     if (type === "all") {
         const [movies, shows] = await Promise.all([
@@ -203,12 +203,16 @@ async function loadUpdatesLogic(user, id, sort, page) {
 
 async function fetchTraktList(section, type, sort, page, user, id) {
     const limit = 20; 
-    
-    // 修复点：如果选择的是 "collection"，我们将其映射为 "likes" (API端点)
-    // 这样就能获取到网页版 /favorites 的内容了
-    const apiEndpoint = section === "collection" ? "likes" : section;
+    let url = "";
 
-    const url = `https://api.trakt.tv/users/${user}/${apiEndpoint}/${type}?extended=full&page=${page}&limit=${limit}`;
+    // 修复重点：如果选的是 "collection" (收藏)，则请求 Favorites List 接口
+    if (section === "collection") {
+        url = `https://api.trakt.tv/users/${user}/lists/favorites/items/${type}?extended=full&page=${page}&limit=${limit}`;
+    } else {
+        // watchlist, history 保持原样
+        url = `https://api.trakt.tv/users/${user}/${section}/${type}?extended=full&page=${page}&limit=${limit}`;
+    }
+
     try {
         const res = await Widget.http.get(url, {
             headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": id }
@@ -221,8 +225,8 @@ function getItemTime(item, section) {
     if (section === "watchlist") return item.listed_at;
     if (section === "history") return item.watched_at;
     
-    // 修复点：如果是 "collection" (实际请求的是 likes)，则使用 liked_at
-    if (section === "collection") return item.liked_at; 
+    // 修复重点：收藏列表 (Favorites) 的时间字段是 listed_at
+    if (section === "collection") return item.listed_at;
     
     return item.created_at || "1970-01-01";
 }
