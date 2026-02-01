@@ -1,6 +1,6 @@
 WidgetMetadata = {
-    id: "trakt_21987_key",
-    title: "Trakt免key版",
+    id: "trakt_98765_key",
+    title: "Trakt",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "内置 API Key 版：只需填写用户名追剧日历、待看、收藏及历史记录。",
     version: "1.1.0", // 版本号 +1
