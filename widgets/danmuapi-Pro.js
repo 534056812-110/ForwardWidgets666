@@ -4,7 +4,7 @@ WidgetMetadata = {
   version: "1.1.0",
   requiredVersion: "0.0.2",
   description: "支持添加多条api并自命名&繁简互转",
-  author: "MakkaPakka",
+  author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
   
     globalParams: [
         { name: "server", title: "源1 (必填)", type: "input", value: "https://api.dandanplay.net" },
