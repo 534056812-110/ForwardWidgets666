@@ -103,11 +103,11 @@
       "url": "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/pingtaidujia.js"
     },
     {
-      "id": "forward.danmu.pro.online_dict",
-      "title": "多源弹幕",
+      "id": "danmu.pro.online_dict",
+      "title": "API多源弹幕",
       "description": "支持添加多条api并自命名&繁简互转",
       "requiredVersion": "0.0.1",
-      "version": "1.0.9",
+      "version": "1.1.0",
       "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
       "url": "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/danmuapi-Pro.js"
     }
