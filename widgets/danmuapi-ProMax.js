@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "danmu.pro.online",
   title: "弹幕多源",
-  version: "1.1.2",
+  version: "1.1.3",
   requiredVersion: "0.0.2",
   description: "支持添加多条api并自命名&繁简互转",
   author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
@@ -20,6 +20,13 @@ WidgetMetadata = {
                 { title: "转简体 (繁->简)", value: "t2s" },
                 { title: "转繁体 (简->繁)", value: "s2t" }
             ]
+        },
+        // 新增：屏蔽词参数
+        { 
+            name: "blockKeywords", 
+            title: "🚫 屏蔽词 (逗号分隔)", 
+            type: "input", 
+            value: "" 
         }
     ],
     modules: [
@@ -152,30 +159,53 @@ async function getDetailById(params) {
 }
 
 async function getCommentsById(params) {
-    const { commentId, convertMode } = params;
+    // 1. 获取参数：ID, 转换模式, 屏蔽词
+    const { commentId, convertMode, blockKeywords } = params;
     if (!commentId) return null;
 
-    // 1. 准备字典
+    // 准备字典
     await initDict(convertMode);
 
-    // 2. 获取源
+    // 获取源
     let server = (await getSource(commentId)) || params.server;
 
     try {
-        // chConvert=0 (关掉服务端的，用我们自己的)
+        // chConvert=0 (关掉服务端的转换，用我们自己的)
         const res = await Widget.http.get(`${server}/api/v2/comment/${commentId}?withRelated=true&chConvert=0`, {
             headers: { "Content-Type": "application/json" }
         });
         const data = typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+        
+        let list = data.comments || [];
 
-        // 3. 执行转换
-        if (convertMode !== "none" && MEM_DICT) {
-            const list = data.comments || [];
-            list.forEach(c => {
-                if (c.m) c.m = convertText(c.m);
-                if (c.message) c.message = convertText(c.message);
-            });
+        // 2. 解析屏蔽词列表 (支持中文逗号和英文逗号，去空格)
+        const blockedList = blockKeywords 
+            ? blockKeywords.split(/[,，]/).map(k => k.trim()).filter(k => k.length > 0) 
+            : [];
+
+        // 3. 执行：转换 + 过滤
+        if (list.length > 0) {
+            // 如果需要转换，先转换
+            if (convertMode !== "none" && MEM_DICT) {
+                list.forEach(c => {
+                    if (c.m) c.m = convertText(c.m);
+                    if (c.message) c.message = convertText(c.message);
+                });
+            }
+
+            // 如果有屏蔽词，执行过滤
+            if (blockedList.length > 0) {
+                data.comments = list.filter(c => {
+                    const msg = c.m || c.message || "";
+                    // 只要包含任意一个屏蔽词，就丢弃
+                    for (const keyword of blockedList) {
+                        if (msg.includes(keyword)) return false; 
+                    }
+                    return true;
+                });
+            }
         }
+        
         return data;
     } catch (e) { return null; }
 }
