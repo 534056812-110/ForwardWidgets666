@@ -6,5 +6,5 @@
 以下插件纯属个人爱好，侵权请联系删除。
 
 一键导入：https://makkapakka518.vercel.app/
-
-纯为爱发电，模块只是自己要用，然后顺便分享，有问题可以私聊频道 https://t.me/makkapakka777
+模块全是AI生成，目的只是自己要用，然后顺便分享。
+有问题可以私聊频道 https://t.me/makkapakka777
