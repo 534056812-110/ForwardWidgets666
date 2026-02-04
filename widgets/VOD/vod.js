@@ -3,6 +3,12 @@ const RESOURCE_SITES = `
 如意资源站,https://cj.rycjapi.com/api.php/provide/vod/at/json/
 量子资源站,https://cj.lziapi.com/api.php/provide/vod/at/json/
 爱奇艺资源站,https://iqiyizyapi.com/api.php/provide/vod/
+卧龙资源,https://wolongzyw.com/api.php/provide/vod
+最大资源,https://api.zuidapi.com/api.php/provide/vod
+暴风资源,https://bfzyapi.com/api.php/provide/vod
+无尽资源,https://api.wujinapi.com/api.php/provide/vod
+百度云资源,https://api.apibdzy.com/api.php/provide/vod
+
 `;
 
 const CHINESE_NUM_MAP = {
