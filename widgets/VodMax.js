@@ -7,13 +7,13 @@ const CHINESE_NUM_MAP = {
 };
 
 WidgetMetadata = {
-  id: "vod_stream_Max",
-  title: "VOD Max",
+  id: "vod_fix",
+  title: "VOD Stream (在线源修复版)",
   icon: "https://assets.vvebo.vip/scripts/icon.png",
-  version: "1.0.2",
+  version: "1.2.3",
   requiredVersion: "0.0.1",
-  description: "为你的Forward提供VOD资源",
-  author: "𝙈𝙖𝙠𝙠𝙖 ℙ𝕒𝕜𝕜𝕒",
+  description: "聚合VOD资源，修复JSON解析问题",
+  author: "MakkaPakka & 两块",
   site: "https://github.com/MakkaPakka518/ForwardWidgets",
   globalParams: [
     {
@@ -27,9 +27,9 @@ WidgetMetadata = {
     },
     {
       name: "VodData",
-      title: "源配置 (JSON/CSV内容 或 在线URL)",
+      title: "源配置 (JSON/CSV内容 或 URL)",
       type: "input",
-      value: DEFAULT_SOURCE_URL // 这里直接使用你的链接
+      value: DEFAULT_SOURCE_URL
     }
   ],
   modules: [
@@ -105,39 +105,52 @@ function extractPlayInfoForCache(item, siteTitle, type) {
   });
 }
 
-// 核心修改：支持解析 文本内容 或 转换后的对象
+// 核心修复：更健壮的源解析逻辑
 function parseResourceSites(content) {
-  // 如果已经是对象（JSON解析后），直接处理
-  if (typeof content === 'object') {
-     // 兼容不同的JSON格式 key: name/title/key, url/value/api
-     return (Array.isArray(content) ? content : []).map(s => ({ 
-        title: s.name || s.title || s.key, 
-        value: s.url || s.value || s.api 
-     })).filter(s => s.title && s.value);
+  let list = [];
+  
+  // 1. 如果是字符串，尝试解析 JSON 或处理 CSV
+  if (typeof content === 'string') {
+    const trimmed = content.trim();
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      try {
+        content = JSON.parse(trimmed); // 变成对象处理
+      } catch (e) {
+        // 解析失败，可能是CSV
+      }
+    }
+    
+    // 如果依然是字符串，按CSV处理
+    if (typeof content === 'string') {
+      return trimmed.split('\n').map(line => {
+        const [title, value] = line.split(',').map(s => s.trim());
+        if (title && value?.startsWith('http')) {
+          return { title, value: value.endsWith('/') ? value : value + '/' };
+        }
+        return null;
+      }).filter(Boolean);
+    }
   }
 
-  // 如果是字符串
-  const trimmed = String(content || "").trim();
-  
-  try {
-    // 尝试解析JSON字符串
-    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-      return JSON.parse(trimmed).map(s => ({ 
-          title: s.name || s.title || s.key, 
-          value: s.url || s.value || s.api 
-      })).filter(s => s.title && s.value);
+  // 2. 如果是对象/数组 (可能是直接传入，也可能是 parse 出来的)
+  if (typeof content === 'object' && content !== null) {
+    if (Array.isArray(content)) {
+      list = content;
+    } else if (content.sites && Array.isArray(content.sites)) {
+      // 兼容 TVBox 配置格式: { "sites": [...] }
+      list = content.sites;
+    } else if (content.data && Array.isArray(content.data)) {
+      list = content.data;
+    } else if (content.list && Array.isArray(content.list)) {
+      list = content.list;
     }
-    // 尝试解析CSV (逗号分隔)
-    return trimmed.split('\n').map(line => {
-      const [title, value] = line.split(',').map(s => s.trim());
-      if (title && value?.startsWith('http')) {
-        return { title, value: value.endsWith('/') ? value : value + '/' };
-      }
-      return null;
-    }).filter(Boolean);
-  } catch (e) {
-    return [];
   }
+
+  // 3. 映射字段 (兼容 api, url, value 等多种写法)
+  return list.map(s => ({ 
+      title: s.key || s.name || s.title, 
+      value: s.api || s.url || s.value 
+  })).filter(s => s.title && s.value);
 }
 
 // --- 主入口函数 ---
@@ -147,46 +160,49 @@ async function loadResource(params) {
   
   if (multiSource !== "enabled" || !seriesName) return [];
 
-  // 1. 获取源配置 (新增：支持在线URL获取)
+  // 1. 获取源配置
   let rawSourceData = VodData;
   
-  // 如果输入的是 http 开头的链接，先去下载内容
   if (rawSourceData && rawSourceData.trim().startsWith("http")) {
       try {
           const res = await Widget.http.get(rawSourceData.trim());
-          rawSourceData = res.data; // 获取到的可能是 JSON 对象或字符串
+          // 注意：res.data 可能是 JSON 对象，也可能是 JSON 字符串，parseResourceSites 会自动处理
+          rawSourceData = res.data; 
       } catch (e) {
-          console.error("在线源获取失败");
+          console.error("在线源下载失败");
           return [];
       }
   }
 
   const resourceSites = parseResourceSites(rawSourceData);
-  if (resourceSites.length === 0) return []; // 无有效源
+  if (resourceSites.length === 0) {
+      console.log("未解析到任何有效源，请检查 JSON 格式");
+      return []; 
+  }
 
   const { baseName, seasonNumber } = extractSeasonInfo(seriesName);
   const targetSeason = season ? parseInt(season) : seasonNumber;
   const targetEpisode = episode ? parseInt(episode) : null;
 
   // 2. 尝试从缓存获取
-  const cacheKey = `vod_exact_cache_${baseName}_s${targetSeason}_${type}`;
+  const cacheKey = `vod_exact_v2_${baseName}_s${targetSeason}_${type}`;
   let allResources = [];
   
   try {
     const cached = Widget.storage.get(cacheKey);
-    if (cached && Array.isArray(cached)) {
+    if (cached && Array.isArray(cached) && cached.length > 0) {
       console.log(`命中缓存: ${cacheKey}`);
       allResources = cached;
     }
   } catch (e) {}
 
-  // 3. 如果没有缓存，则发起网络请求
+  // 3. 网络请求
   if (allResources.length === 0) {
     const fetchTasks = resourceSites.map(async (site) => {
       try {
         const response = await Widget.http.get(site.value, {
           params: { ac: "detail", wd: baseName.trim() },
-          timeout: 10000 
+          timeout: 8000 
         });
         const list = response?.data?.list;
         if (!Array.isArray(list)) return [];
@@ -194,6 +210,7 @@ async function loadResource(params) {
         return list.flatMap(item => {
           const itemInfo = extractSeasonInfo(item.vod_name);
           
+          // 精确匹配逻辑
           if (itemInfo.baseName !== baseName || itemInfo.seasonNumber !== targetSeason) {
             return [];
           }
@@ -208,7 +225,7 @@ async function loadResource(params) {
     const results = await Promise.all(fetchTasks);
     const merged = results.flat();
 
-    // URL 去重
+    // 去重
     const urlSet = new Set();
     allResources = merged.filter(res => {
       if (urlSet.has(res.url)) return false;
@@ -216,7 +233,6 @@ async function loadResource(params) {
       return true;
     });
 
-    // 写入缓存
     if (allResources.length > 0) {
       try { Widget.storage.set(cacheKey, allResources, 10800); } catch (e) {}
     }
