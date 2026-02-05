@@ -1,9 +1,9 @@
 WidgetMetadata = {
     id: "imdb_cn_fix_",
-    title: "IMDb & 国产热榜",
+    title: "IMDb热榜",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    description: "聚合IMDb全球榜单与国产剧集热度，支持日/周维度切换。",
-    version: "1.0.2",
+    description: "IMDb全球榜单，支持日/周维度切换。",
+    version: "1.0.3",
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
     globalParams: [],
