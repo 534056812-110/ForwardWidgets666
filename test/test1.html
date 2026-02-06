@@ -32,12 +32,12 @@
         body {
             background-color: #050505;
             color: white;
-            /* 关键：使用 DVH 确保在移动端浏览器（Safari/Chrome）中高度计算准确 */
+            /* 保持 Flex 布局逻辑，确保不遮挡 */
             height: 100vh;
             height: 100dvh; 
-            overflow: hidden; /* 禁止整体页面滚动 */
+            overflow: hidden;
             display: flex;
-            flex-direction: column; /* 垂直排列：头-中-底 */
+            flex-direction: column;
             position: relative;
         }
 
@@ -106,11 +106,11 @@
             pointer-events: none;
         }
 
-        /* 🃏 滑动容器与组件样式 */
+        /* 🃏 滑动容器 */
         .snap-x-mandatory { scroll-snap-type: x mandatory; }
         .snap-center { scroll-snap-align: center; }
-        /* 这里的 padding 保持左右留白，但去掉了上下 padding，交给 flex 布局控制 */
-        #slider-container { padding: 0 max(calc(50vw - 125px), 2rem); } 
+        /* 调整 Padding 以适应较宽的卡片 */
+        #slider-container { padding: 0 max(calc(50vw - 140px), 1.5rem); } 
         
         .card-gradient-1 { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
         .card-gradient-2 { background: linear-gradient(135deg, #3b82f6 0%, #2dd4bf 100%); }
@@ -120,11 +120,9 @@
         .spin-trigger { transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
         .spin-active { transform: rotate(1080deg); }
 
-        /* 📱 底部 Dock - 修改关键点 */
+        /* 📱 底部 Dock (Flex 布局核心) */
         .bottom-dock {
-            /* 移除 fixed，移除 absolute，让它占据真实空间 */
-            /* position: fixed;  <-- 删除这行 */
-            flex-shrink: 0; /* 防止被挤压 */
+            flex-shrink: 0;
             padding-bottom: env(safe-area-inset-bottom);
             background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(25px);
@@ -175,7 +173,6 @@
             <div id="poster-grid-2" class="poster-grid"></div>
         </div>
     </div>
-    
     <div class="bg-overlay"></div>
 
     <div class="absolute top-6 right-6 z-50">
@@ -207,7 +204,7 @@
     <main class="flex-grow flex flex-col justify-center relative z-10 min-h-0">
         <div id="slider-container" 
              class="flex overflow-x-auto hide-scrollbar snap-x-mandatory gap-5 items-center w-full h-full">
-             </div>
+        </div>
     </main>
 
     <div class="bottom-dock w-full z-50">
@@ -262,9 +259,7 @@
         // ==========================================
         // 🎬 1. 海报墙逻辑
         // ==========================================
-        
         const TMDB_API_KEY = ''; 
-
         const BACKUP_POSTERS = [
             "/t6HIqrKwXtvO99nJ9lqCDB01Co.jpg", "/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg", 
             "/3bhkrj58Vtu7enYsRolD1fZdja1.jpg", "/q6y0Go1r1oFpnJqC6K0jh0W5UP.jpg", 
@@ -287,195 +282,51 @@
             const grid1 = document.getElementById('poster-grid-1');
             const grid2 = document.getElementById('poster-grid-2');
             const posterBaseUrl = 'https://image.tmdb.org/t/p/w300';
-            
             let posters = [];
-
             try {
                 if (TMDB_API_KEY && TMDB_API_KEY.length > 10) {
                     const response = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${TMDB_API_KEY}&language=zh-CN&page=1`);
                     if (response.ok) {
                         const data = await response.json();
-                        if (data.results && data.results.length > 0) {
-                            posters = data.results.map(m => m.poster_path);
-                            const response2 = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${TMDB_API_KEY}&language=zh-CN&page=2`);
-                            if (response2.ok) {
-                                const data2 = await response2.json();
-                                if (data2.results) posters = posters.concat(data2.results.map(m => m.poster_path));
-                            }
-                        }
+                        if (data.results) posters = data.results.map(m => m.poster_path);
                     }
                 }
-            } catch (e) { console.log("API Fail"); }
-
+            } catch (e) {}
             if (posters.length === 0) posters = [...BACKUP_POSTERS].sort(() => 0.5 - Math.random());
-
             let displayList = [...posters];
             while (displayList.length < 48) displayList = displayList.concat(posters);
-            displayList = displayList.slice(0, 48);
-
-            let gridHtml = '';
-            displayList.forEach(path => {
-                const cleanPath = path.startsWith('/') ? path : '/' + path;
-                gridHtml += `<img src="${posterBaseUrl + cleanPath}" class="poster-img" loading="lazy" alt="Poster">`;
-            });
-
-            grid1.innerHTML = gridHtml;
-            grid2.innerHTML = gridHtml;
+            let gridHtml = displayList.slice(0, 48).map(path => `<img src="${posterBaseUrl + (path.startsWith('/')?'':'/') + path}" class="poster-img" loading="lazy">`).join('');
+            grid1.innerHTML = gridHtml; grid2.innerHTML = gridHtml;
         }
 
         // ==========================================
-        // 🔧 2. 原有逻辑
+        // 🔧 2. 主要逻辑
         // ==========================================
-
         const i18n = {
-            "zh-CN": {
-                subtitle: "左右滑动选择组件",
-                contact: "联系作者",
-                preview: "一键导入我的首页",
-                importAll: "一键导入全部模块",
-                modalTitle: "下滑预览",
-                modalBtn: "确认并导入配置",
-                addBtn: "添加"
-            },
-            "zh-TW": {
-                subtitle: "左右滑動選擇組件",
-                contact: "聯繫作者",
-                preview: "一鍵導入我的首頁",
-                importAll: "一鍵導入全部模塊",
-                modalTitle: "下滑預覽",
-                modalBtn: "確認並導入配置",
-                addBtn: "添加"
-            },
-            "en": {
-                subtitle: "Swipe to explore widgets",
-                contact: "Contact Author",
-                preview: "Import My Homepage",
-                importAll: "Import All Modules",
-                modalTitle: "Preview",
-                modalBtn: "Confirm & Import",
-                addBtn: "Add"
-            }
+            "zh-CN": { subtitle: "左右滑动选择组件", contact: "联系作者", preview: "一键导入我的首页", importAll: "一键导入全部模块", modalTitle: "下滑预览", modalBtn: "确认并导入配置", addBtn: "添加" },
+            "zh-TW": { subtitle: "左右滑動選擇組件", contact: "聯繫作者", preview: "一鍵導入我的首頁", importAll: "一鍵導入全部模塊", modalTitle: "下滑預覽", modalBtn: "確認並導入配置", addBtn: "添加" },
+            "en": { subtitle: "Swipe to explore widgets", contact: "Contact Author", preview: "Import My Homepage", importAll: "Import All Modules", modalTitle: "Preview", modalBtn: "Confirm & Import", addBtn: "Add" }
         };
 
         const config = {
             forwardBase: "https://gocy.pages.dev/#forward://widget?url=",
             collectionUrl: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets.fwd",
             widgets: [
-                { 
-                    id: "anime_omni", 
-                    icon: "fa-ghost", gradient: "card-gradient-1", version: "2.2.4",
-                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/animeone.js",
-                    lang: {
-                        "zh-CN": { title: "二次元全境聚合", desc: "多平台动漫榜单聚合" },
-                        "zh-TW": { title: "二次元全境聚合", desc: "多平台動漫榜單聚合" },
-                        "en": { title: "Anime Omni", desc: "Multi-platform Anime Charts" }
-                    }
-                },
-                { 
-                    id: "trakt_cal", 
-                    icon: "fa-calendar-check", gradient: "card-gradient-3", version: "1.0.8",
-                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/traktkey.js",
-                    lang: {
-                        "zh-CN": { title: "Trakt 追剧日历", desc: "免Key / 个人中心集成" },
-                        "zh-TW": { title: "Trakt 追劇日曆", desc: "免Key / 個人中心集成" },
-                        "en": { title: "Trakt Calendar", desc: "No-Key / Personal Hub" }
-                    }
-                },
-                { 
-                    id: "variety_hub", 
-                    icon: "fa-masks-theater", gradient: "card-gradient-2", version: "2.0.3",
-                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/danyi/zongyi.js",
-                    lang: {
-                        "zh-CN": { title: "全球综艺热度榜", desc: "综艺更新表与热度" },
-                        "zh-TW": { title: "全球綜藝熱度榜", desc: "綜藝更新表與熱度" },
-                        "en": { title: "Variety Hub", desc: "Global Variety Show Trends" }
-                    }
-                },
-                { 
-                    id: "global_tv", 
-                    icon: "fa-clock", gradient: "card-gradient-4", version: "2.0.9",
-                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/zhuijurili-one.js",
-                    lang: {
-                        "zh-CN": { title: "全球追剧时刻表", desc: "剧集/综艺/动漫周更" },
-                        "zh-TW": { title: "全球追劇時刻表", desc: "劇集/綜藝/動漫周更" },
-                        "en": { title: "Global TV Schedule", desc: "Weekly TV/Show/Anime" }
-                    }
-                },
-                { 
-                    id: "western_hub", 
-                    icon: "fa-star", gradient: "card-gradient-1", version: "1.0.2",
-                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/bangdan-one.js",
-                    lang: {
-                        "zh-CN": { title: "欧美风向标", desc: "烂番茄口碑 & 流媒体热度" },
-                        "zh-TW": { title: "歐美風向標", desc: "爛番茄口碑 & 串流熱度" },
-                        "en": { title: "Western Trends", desc: "Rotten Tomatoes & Streaming" }
-                    }
-                },
-                { 
-                    id: "cinephile", 
-                    icon: "fa-film", gradient: "card-gradient-2", version: "1.0.3",
-                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/movielist%26interesting.js",
-                    lang: {
-                        "zh-CN": { title: "影迷宝藏", desc: "系列电影 & 流派探索" },
-                        "zh-TW": { title: "影迷寶藏", desc: "系列電影 & 流派探索" },
-                        "en": { title: "Cinephile Gems", desc: "Series Collections & Genres" }
-                    }
-                },
-                { 
-                    id: "discover", 
-                    icon: "fa-compass", gradient: "card-gradient-3", version: "1.0.4",
-                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/today-one.js",
-                    lang: {
-                        "zh-CN": { title: "探索发现", desc: "今天看什么 / 那年今日" },
-                        "zh-TW": { title: "探索發現", desc: "今天看什麼 / 那年今日" },
-                        "en": { title: "Discovery", desc: "What to Watch / On This Day" }
-                    }
-                },
-                { 
-                    id: "media_hub", 
-                    icon: "fa-network-wired", gradient: "card-gradient-4", version: "1.2.1",
-                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/cn-int-bangdan.js",
-                    lang: {
-                        "zh-CN": { title: "全球影视聚合", desc: "Trakt / 豆瓣 / 平台分流" },
-                        "zh-TW": { title: "全球影視聚合", desc: "Trakt / 豆瓣 / 平台分流" },
-                        "en": { title: "Media Aggregator", desc: "Trakt / Douban / Platforms" }
-                    }
-                },
-                { 
-                    id: "platform", 
-                    icon: "fa-tv", gradient: "card-gradient-1", version: "1.0.5",
-                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/zhijiyong-myself/pingtai.js",
-                    lang: {
-                        "zh-CN": { title: "流媒体独家", desc: "Netflix/HBO/B站自制" },
-                        "zh-TW": { title: "串流獨家", desc: "Netflix/HBO/B站自製" },
-                        "en": { title: "Originals", desc: "Netflix/HBO/Bilibili etc." }
-                    }
-                },
-                { 
-                    id: "danmu", 
-                    icon: "fa-comments", gradient: "card-gradient-2", version: "1.1.3",
-                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/danmuapi-ProMax.js",
-                    lang: {
-                        "zh-CN": { title: "弹幕 Pro", desc: "多源API & 繁简转换" },
-                        "zh-TW": { title: "彈幕 Pro", desc: "多源API & 繁簡轉換" },
-                        "en": { title: "Danmu Pro", desc: "Multi-Source API & Convert" }
-                    }
-                },
-                { 
-                    id: "imdb", 
-                    icon: "fa-ranking-star", gradient: "card-gradient-3", version: "1.0.3",
-                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/imdb%26cn.js",
-                    lang: {
-                        "zh-CN": { title: "IMDb 热榜", desc: "全球权威影视热榜" },
-                        "zh-TW": { title: "IMDb 熱榜", desc: "全球權威影視熱榜" },
-                        "en": { title: "IMDb Charts", desc: "Global Top Trending" }
-                    }
-                }
+                { id: "anime_omni", icon: "fa-ghost", gradient: "card-gradient-1", version: "2.2.4", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/animeone.js", lang: { "zh-CN": { title: "二次元全境聚合", desc: "多平台动漫榜单聚合" }, "zh-TW": { title: "二次元全境聚合", desc: "多平台動漫榜單聚合" }, "en": { title: "Anime Omni", desc: "Multi-platform Anime Charts" } } },
+                { id: "trakt_cal", icon: "fa-calendar-check", gradient: "card-gradient-3", version: "1.0.8", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/traktkey.js", lang: { "zh-CN": { title: "Trakt 追剧日历", desc: "免Key / 个人中心集成" }, "zh-TW": { title: "Trakt 追劇日曆", desc: "免Key / 個人中心集成" }, "en": { title: "Trakt Calendar", desc: "No-Key / Personal Hub" } } },
+                { id: "variety_hub", icon: "fa-masks-theater", gradient: "card-gradient-2", version: "2.0.3", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/danyi/zongyi.js", lang: { "zh-CN": { title: "全球综艺热度榜", desc: "综艺更新表与热度" }, "zh-TW": { title: "全球綜藝熱度榜", desc: "綜藝更新表與熱度" }, "en": { title: "Variety Hub", desc: "Global Variety Show Trends" } } },
+                { id: "global_tv", icon: "fa-clock", gradient: "card-gradient-4", version: "2.0.9", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/zhuijurili-one.js", lang: { "zh-CN": { title: "全球追剧时刻表", desc: "剧集/综艺/动漫周更" }, "zh-TW": { title: "全球追劇時刻表", desc: "劇集/綜藝/動漫周更" }, "en": { title: "Global TV Schedule", desc: "Weekly TV/Show/Anime" } } },
+                { id: "western_hub", icon: "fa-star", gradient: "card-gradient-1", version: "1.0.2", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/bangdan-one.js", lang: { "zh-CN": { title: "欧美风向标", desc: "烂番茄口碑 & 流媒体热度" }, "zh-TW": { title: "歐美風向標", desc: "爛番茄口碑 & 串流熱度" }, "en": { title: "Western Trends", desc: "Rotten Tomatoes & Streaming" } } },
+                { id: "cinephile", icon: "fa-film", gradient: "card-gradient-2", version: "1.0.3", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/movielist%26interesting.js", lang: { "zh-CN": { title: "影迷宝藏", desc: "系列电影 & 流派探索" }, "zh-TW": { title: "影迷寶藏", desc: "系列電影 & 流派探索" }, "en": { title: "Cinephile Gems", desc: "Series Collections & Genres" } } },
+                { id: "discover", icon: "fa-compass", gradient: "card-gradient-3", version: "1.0.4", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/today-one.js", lang: { "zh-CN": { title: "探索发现", desc: "今天看什么 / 那年今日" }, "zh-TW": { title: "探索發現", desc: "今天看什麼 / 那年今日" }, "en": { title: "Discovery", desc: "What to Watch / On This Day" } } },
+                { id: "media_hub", icon: "fa-network-wired", gradient: "card-gradient-4", version: "1.2.1", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/cn-int-bangdan.js", lang: { "zh-CN": { title: "全球影视聚合", desc: "Trakt / 豆瓣 / 平台分流" }, "zh-TW": { title: "全球影視聚合", desc: "Trakt / 豆瓣 / 平台分流" }, "en": { title: "Media Aggregator", desc: "Trakt / Douban / Platforms" } } },
+                { id: "platform", icon: "fa-tv", gradient: "card-gradient-1", version: "1.0.5", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/zhijiyong-myself/pingtai.js", lang: { "zh-CN": { title: "流媒体独家", desc: "Netflix/HBO/B站自制" }, "zh-TW": { title: "串流獨家", desc: "Netflix/HBO/B站自製" }, "en": { title: "Originals", desc: "Netflix/HBO/Bilibili etc." } } },
+                { id: "danmu", icon: "fa-comments", gradient: "card-gradient-2", version: "1.1.3", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/danmuapi-ProMax.js", lang: { "zh-CN": { title: "弹幕 Pro", desc: "多源API & 繁简转换" }, "zh-TW": { title: "彈幕 Pro", desc: "多源API & 繁簡轉換" }, "en": { title: "Danmu Pro", desc: "Multi-Source API & Convert" } } },
+                { id: "imdb", icon: "fa-ranking-star", gradient: "card-gradient-3", version: "1.0.3", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/imdb%26cn.js", lang: { "zh-CN": { title: "IMDb 热榜", desc: "全球权威影视热榜" }, "zh-TW": { title: "IMDb 熱榜", desc: "全球權威影視熱榜" }, "en": { title: "IMDb Charts", desc: "Global Top Trending" } } }
             ]
         };
 
         let currentLang = 'zh-CN';
-
         document.getElementById('import-all-btn').href = config.forwardBase + encodeURIComponent(config.collectionUrl);
         const slider = document.getElementById('slider-container');
 
@@ -485,11 +336,11 @@
                 const gradientClass = `card-gradient-${(i % 4) + 1}`;
                 const link = config.forwardBase + encodeURIComponent(w.url);
                 const txt = w.lang[currentLang] || w.lang['zh-CN'];
-                const addText = i18n[currentLang].addBtn;
                 
-                // 💎 保持了修长的比例
+                // 💎 修改点：改回了较宽、较矮的经典比例
+                // w-[64vw] (宽), h-[300px] (适中)
                 const card = `
-                    <div class="snap-center widget-card shrink-0 w-[56vw] sm:w-[250px] h-[350px] relative rounded-[1.8rem] overflow-hidden flex flex-col group active:scale-95">
+                    <div class="snap-center widget-card shrink-0 w-[64vw] sm:w-[280px] h-[300px] relative rounded-[1.8rem] overflow-hidden flex flex-col group active:scale-95">
                         <div class="absolute inset-0 ${gradientClass} opacity-90"></div>
                         <div class="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
                         
@@ -507,7 +358,7 @@
                                     <span class="text-[10px] font-mono bg-black/20 px-2 py-0.5 rounded-md">v${w.version}</span>
                                 </div>
                                 <a href="${link}" class="flex items-center justify-center w-full py-3 bg-white text-slate-900 rounded-xl font-bold shadow-xl hover:bg-slate-100 transition-colors text-sm">
-                                    <i class="fa-solid fa-plus mr-2 text-[10px]"></i> ${addText}
+                                    <i class="fa-solid fa-plus mr-2 text-[10px]"></i> ${i18n[currentLang].addBtn}
                                 </a>
                             </div>
                         </div>
@@ -534,18 +385,13 @@
             const container = slider;
             const center = container.scrollLeft + container.offsetWidth / 2;
             const cards = document.querySelectorAll('.widget-card');
-
             cards.forEach(card => {
                 const cardCenter = card.offsetLeft + card.offsetWidth / 2;
                 const distance = Math.abs(center - cardCenter);
-                if (distance < container.offsetWidth * 0.35) {
-                    card.classList.add('is-active');
-                } else {
-                    card.classList.remove('is-active');
-                }
+                if (distance < container.offsetWidth * 0.35) card.classList.add('is-active');
+                else card.classList.remove('is-active');
             });
         }
-
         slider.addEventListener('scroll', updateSliderEffect);
         
         renderWidgets();
@@ -554,28 +400,20 @@
 
         function spinAvatar(el) {
             const img = el.querySelector('img');
-            img.classList.remove('spin-active');
-            void img.offsetWidth; 
-            img.classList.add('spin-active');
+            img.classList.remove('spin-active'); void img.offsetWidth; img.classList.add('spin-active');
             if(navigator.vibrate) navigator.vibrate(50);
         }
 
         function randomTitleColor(el) {
             const text = document.getElementById('title-text');
             const colors = ['from-blue-400 to-purple-400', 'from-green-400 to-cyan-400', 'from-yellow-400 to-red-400', 'from-pink-400 to-rose-400'];
-            const newColor = colors[Math.floor(Math.random() * colors.length)];
-            text.className = `bg-clip-text text-transparent bg-gradient-to-r ${newColor} transition-all duration-500`;
+            text.className = `bg-clip-text text-transparent bg-gradient-to-r ${colors[Math.floor(Math.random() * colors.length)]} transition-all duration-500`;
         }
 
         function togglePreview(show) {
             const modal = document.getElementById('preview-modal');
-            if (show) {
-                modal.classList.remove('hidden');
-                setTimeout(() => modal.classList.remove('opacity-0'), 10);
-            } else {
-                modal.classList.add('opacity-0');
-                setTimeout(() => modal.classList.add('hidden'), 300);
-            }
+            if (show) { modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10); }
+            else { modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); }
         }
     </script>
 </body>
