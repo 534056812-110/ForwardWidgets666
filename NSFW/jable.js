@@ -1,17 +1,18 @@
 WidgetMetadata = {
-    id: "jable_pro_optimized_v3",
+    id: "jable_pro_max_makka",
     title: "Jable Pro",
-    description: "支持在分类中手动输入关键词进行搜索。",
+    description: "支持手动搜索筛选，点击即可直接播放。",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     site: "https://jable.tv",
-    version: "2.1.0",
+    version: "2.2.0",
     requiredVersion: "0.0.2",
     detailCacheDuration: 60,
+    globalParams: [],
     modules: [
-        // --- 搜索模块 ---
         {
             title: "🔍 全局搜索",
             functionName: "searchWrapper",
+            requiresWebView: false,
             type: "list",
             params: [
                 { name: "keyword", title: "关键词", type: "input", value: "" },
@@ -30,10 +31,10 @@ WidgetMetadata = {
                 { name: "page", title: "页码", type: "page", value: "1" },
             ],
         },
-        // --- 热门模块 ---
         {
             title: "🔥 热门榜单",
             functionName: "loadListWrapper",
+            requiresWebView: false,
             type: "list",
             params: [
                 { name: "path", type: "constant", value: "/hot/" },
@@ -52,10 +53,10 @@ WidgetMetadata = {
                 { name: "page", title: "页码", type: "page", value: "1" },
             ],
         },
-        // --- 最新模块 ---
         {
             title: "🆕 最新更新",
             functionName: "loadListWrapper",
+            requiresWebView: false,
             type: "list",
             params: [
                 { name: "path", type: "constant", value: "/new-release/" },
@@ -73,37 +74,17 @@ WidgetMetadata = {
                 { name: "page", title: "页码", type: "page", value: "1" },
             ],
         },
-        // --- 中文模块 ---
         {
-            title: "🇨🇳 中文",
-            functionName: "loadListWrapper",
-            type: "list",
-            params: [
-                { name: "path", type: "constant", value: "/categories/chinese-subtitle/" },
-                {
-                    name: "sort_by",
-                    title: "排序",
-                    type: "enumeration",
-                    value: "post_date",
-                    enumOptions: [
-                        { title: "最近更新", value: "post_date" },
-                        { title: "最多观看", value: "video_viewed" },
-                    ],
-                },
-                { name: "page", title: "页码", type: "page", value: "1" },
-            ],
-        },
-        // --- 女优模块 (带手动输入) ---
-        {
-            title: "💃 女优",
+            title: "💃 女优筛选",
             functionName: "loadCategoryWrapper",
+            requiresWebView: false,
             type: "list",
             params: [
                 {
                     name: "manual_input",
-                    title: "🔍 手动搜索 (优先使用)",
+                    title: "🔍 手动搜索 (优先)",
                     type: "input",
-                    description: "输入女优名字，将忽略下方选择",
+                    description: "输入名字(如:深田咏美)，将忽略下方选择",
                     value: ""
                 },
                 {
@@ -147,17 +128,17 @@ WidgetMetadata = {
                 { name: "page", title: "页码", type: "page", value: "1" },
             ],
         },
-        // --- 衣着模块 (带手动输入) ---
         {
-            title: "👙 衣着",
+            title: "👙 衣着筛选",
             functionName: "loadCategoryWrapper",
+            requiresWebView: false,
             type: "list",
             params: [
                 {
                     name: "manual_input",
-                    title: "🔍 手动搜索 (优先使用)",
+                    title: "🔍 手动搜索 (优先)",
                     type: "input",
-                    description: "输入标签名，将忽略下方选择",
+                    description: "输入标签(如:白丝)，将忽略下方选择",
                     value: ""
                 },
                 {
@@ -188,17 +169,17 @@ WidgetMetadata = {
                 { name: "page", title: "页码", type: "page", value: "1" },
             ],
         },
-        // --- 剧情模块 (带手动输入) ---
         {
-            title: "🎬 剧情",
+            title: "🎬 剧情筛选",
             functionName: "loadCategoryWrapper",
+            requiresWebView: false,
             type: "list",
             params: [
                 {
                     name: "manual_input",
-                    title: "🔍 手动搜索 (优先使用)",
+                    title: "🔍 手动搜索 (优先)",
                     type: "input",
-                    description: "输入关键词，将忽略下方选择",
+                    description: "输入关键词(如:NTR)，将忽略下方选择",
                     value: ""
                 },
                 {
@@ -225,137 +206,94 @@ WidgetMetadata = {
                 { name: "sort_by", title: "排序", type: "enumeration", value: "post_date", enumOptions: [{ title: "更新", value: "post_date" }, { title: "观看", value: "video_viewed" }] },
                 { name: "page", title: "页码", type: "page", value: "1" },
             ],
-        },
-        // --- 角色模块 (带手动输入) ---
-        {
-            title: "🎭 角色",
-            functionName: "loadCategoryWrapper",
-            type: "list",
-            params: [
-                {
-                    name: "manual_input",
-                    title: "🔍 手动搜索 (优先使用)",
-                    type: "input",
-                    value: ""
-                },
-                {
-                    name: "path",
-                    title: "选择角色",
-                    type: "enumeration",
-                    value: "/tags/wife/",
-                    enumOptions: [
-                        { title: "人妻", value: "/tags/wife/" },
-                        { title: "老师", value: "/tags/teacher/" },
-                        { title: "护士", value: "/tags/nurse/" },
-                        { title: "空姐", value: "/tags/flight-attendant/" },
-                        { title: "学生", value: "/tags/school/" },
-                        { title: "女上司", value: "/tags/female-boss/" },
-                        { title: "风俗娘", value: "/tags/club-hostess-and-sex-worker/" },
-                        { title: "未亡人", value: "/tags/widow/" }
-                    ],
-                },
-                { name: "sort_by", title: "排序", type: "enumeration", value: "post_date", enumOptions: [{ title: "更新", value: "post_date" }, { title: "观看", value: "video_viewed" }] },
-                { name: "page", title: "页码", type: "page", value: "1" },
-            ],
         }
-    ],
+    ]
 };
 
-// ================= 常量定义 (放在 Metadata 之后) =================
+// ==========================================
+// 业务逻辑函数 (全部独立，确保导入成功)
+// ==========================================
 
-const CONFIG = {
-    BASE_URL: "https://jable.tv",
-    COMMON_SUFFIX: "?mode=async&function=get_block&block_id=list_videos_common_videos_list",
-    SEARCH_SUFFIX: "?mode=async&function=get_block&block_id=list_videos_videos_list_search_result",
-    headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://jable.tv/",
-    }
-};
-
-// ================= 业务逻辑 =================
-
-// 1. 搜索包装器
 async function searchWrapper(params) {
     return await executeSearch(params.keyword, params.sort_by, params.page);
 }
 
-// 2. 普通列表包装器
 async function loadListWrapper(params) {
-    let url = `${CONFIG.BASE_URL}${params.path}${CONFIG.COMMON_SUFFIX}`;
+    const baseUrl = "https://jable.tv";
+    const suffix = "?mode=async&function=get_block&block_id=list_videos_common_videos_list";
+    let url = `${baseUrl}${params.path}${suffix}`;
     return await fetchAndParse(url, params.sort_by, params.page);
 }
 
-// 3. 分类/标签包装器（支持手动输入）
 async function loadCategoryWrapper(params) {
-    // 逻辑优化：只要手动输入框有内容，直接切换为搜索模式
+    // 手动输入逻辑：如果用户输入了文字，优先执行搜索
     if (params.manual_input && params.manual_input.trim().length > 0) {
         return await executeSearch(params.manual_input.trim(), params.sort_by, params.page);
     }
     
-    // 否则使用下拉菜单选中的 Path
+    // 下拉选择逻辑
+    const baseUrl = "https://jable.tv";
+    const suffix = "?mode=async&function=get_block&block_id=list_videos_common_videos_list";
+    
     let path = params.path;
     if (!path.startsWith("http")) {
-        path = CONFIG.BASE_URL + path;
+        path = baseUrl + path;
     }
     
-    // 自动补全 API 参数
     let url = path;
     if (!url.includes("mode=async")) {
-        url += CONFIG.COMMON_SUFFIX;
+        url += suffix;
     }
     
     return await fetchAndParse(url, params.sort_by, params.page);
 }
 
-// 4. 执行搜索的核心逻辑
 async function executeSearch(keyword, sortBy, page) {
     if (!keyword) return [];
+    const baseUrl = "https://jable.tv";
+    const searchSuffix = "?mode=async&function=get_block&block_id=list_videos_videos_list_search_result";
     const encodedKey = encodeURIComponent(keyword);
-    // 搜索接口有点特殊，需要带上 q 参数
-    let url = `${CONFIG.BASE_URL}/search/${encodedKey}/${CONFIG.SEARCH_SUFFIX}&q=${encodedKey}`;
+    let url = `${baseUrl}/search/${encodedKey}/${searchSuffix}&q=${encodedKey}`;
     return await fetchAndParse(url, sortBy, page);
 }
 
-// 5. 通用网络请求与HTML处理
+// 核心解析函数
 async function fetchAndParse(url, sortBy, page) {
-    // 拼接排序和页码
+    const headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://jable.tv/",
+    };
+
     if (sortBy) url += `&sort_by=${sortBy}`;
     if (page) url += `&from=${page}`;
 
     try {
-        const response = await Widget.http.get(url, { headers: CONFIG.headers });
+        const response = await Widget.http.get(url, { headers: headers });
         
         if (!response || !response.data) {
             return []; 
         }
 
-        // HTML 解析
         const $ = Widget.html.load(response.data);
         const items = [];
 
-        // 遍历视频卡片
         $(".video-img-box").each((i, el) => {
             const $el = $(el);
-            
-            // 提取链接和ID
             const $link = $el.find(".title a").first();
             const href = $link.attr("href");
             if (!href) return;
 
-            // 提取封面
             const $img = $el.find("img").first();
             let cover = $img.attr("data-src") || $img.attr("src");
             const preview = $img.attr("data-preview") || cover;
-
-            // 提取标题和时长
             const title = $link.text().trim(); 
             const duration = $el.find(".absolute-bottom-right .label").text().trim();
             const viewCount = $el.find(".absolute-bottom-left .label").text().trim();
 
             items.push({
                 id: href,
-                type: "url", // 必须是 url 类型才能进入详情页
+                // 这里关键：type: "url" 会触发 Forward 调用 loadDetail
+                type: "url", 
                 title: title,
                 backdropPath: cover, 
                 posterPath: cover,   
@@ -363,40 +301,39 @@ async function fetchAndParse(url, sortBy, page) {
                 link: href,
                 mediaType: "movie",
                 description: `时长: ${duration} | 观看: ${viewCount}`,
-                releaseDate: duration,
-                playerType: "system"
+                // releaseDate 用于显示在副标题
+                releaseDate: duration
             });
         });
 
         return items;
 
     } catch (e) {
-        console.error("Fetch Error:", e);
-        return [{
-            title: "加载失败",
-            description: "请检查网络或稍后重试",
-            type: "text"
-        }];
+        return [{ title: "加载失败", description: "请检查网络或代理", type: "text" }];
     }
 }
 
-// 6. 详情页加载 (解析 m3u8)
+// 播放详情解析函数 (Forward 会自动调用这个)
 async function loadDetail(link) {
+    const headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://jable.tv/",
+    };
+
     try {
-        const response = await Widget.http.get(link, { headers: CONFIG.headers });
+        const response = await Widget.http.get(link, { headers: headers });
         const html = response.data;
         
-        // 正则提取 HLS 地址
+        // 核心：提取 m3u8 地址
         const hlsMatch = html.match(/var hlsUrl = '(.*?)';/);
         let hlsUrl = "";
         if (hlsMatch && hlsMatch[1]) {
             hlsUrl = hlsMatch[1];
         } else {
-            throw new Error("未找到视频地址，可能需要登录或已被删除");
+            throw new Error("未找到视频地址，可能需要验证");
         }
 
         const $ = Widget.html.load(html);
-        
         const title = $("meta[property='og:title']").attr("content") || "Video";
         const cover = $("meta[property='og:image']").attr("content") || "";
         
@@ -419,22 +356,24 @@ async function loadDetail(link) {
              }
         });
 
+        // 返回给 Forward 的播放对象
         return {
             id: link,
-            type: "detail",
+            type: "detail", // 告诉 APP 这是一个详情页
             title: title,
-            videoUrl: hlsUrl,
+            videoUrl: hlsUrl, // 视频流地址
             backdropPath: cover,
             mediaType: "movie",
-            playerType: "system",
+            playerType: "system", // 使用系统播放器
             customHeaders: {
-                "Referer": link,
-                "User-Agent": CONFIG.headers["User-Agent"]
+                "Referer": link, // 必须带 Referer 否则403
+                "User-Agent": headers["User-Agent"]
             },
             childItems: relatedItems
         };
 
     } catch (e) {
+        // 如果解析失败，抛出错误让 APP 提示
         throw e;
     }
 }
