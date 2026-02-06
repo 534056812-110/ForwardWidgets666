@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖's 𝙒𝙞𝙙𝙜𝙚𝙩𝙨</title>
+    
+    <link rel="icon" href="https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/main/icon.png" type="image/png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Outfit"', '-apple-system', 'sans-serif'],
+                    },
+                    animation: {
+                        'spin-slow': 'spin 8s linear infinite',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* 🌌 基础设置 */
+        body {
+            background-color: #050505;
+            color: white;
+            height: 100vh;
+            height: 100dvh; 
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* =========================================
+           🎬 海报墙特效
+        ========================================= */
+        #poster-wall-wrapper {
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            z-index: -2; /* 放在最底层 */
+            transform: rotate(-12deg);
+            overflow: hidden;
+            pointer-events: none;
+            /* 移除亮度提升，让背景稍微暗一点，突出前景 */
+            /* filter: brightness(1.1); */ 
+            opacity: 0.85; /* 稍微降低一点整体不透明度 */
+        }
+
+        #poster-wall-mover {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            animation: wallScrollUp 110s linear infinite;
+        }
+
+        @keyframes wallScrollUp {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-50%); }
+        }
+
+        .poster-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            padding: 8px;
+            width: 100%;
+            align-content: start; 
+        }
+        @media (min-width: 768px) { .poster-grid { grid-template-columns: repeat(6, 1fr); } }
+
+        .poster-img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            opacity: 0.8; /* 提高一点海报自身亮度 */
+            transition: opacity 0.3s;
+            box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.6);
+            /* filter: grayscale(10%); 移除灰度，让色彩更鲜艳 */
+            object-fit: cover;
+            aspect-ratio: 2/3;
+        }
+
+        /* =========================================
+           🌫️ 全新渐进式毛玻璃遮挡 (核心修改)
+        ========================================= */
+        /* 顶部渐进模糊层 */
+        .blur-overlay-top {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 40vh; /* 覆盖屏幕顶部 40% 区域 */
+            z-index: -1; /* 在内容之下，海报墙之上 */
+            pointer-events: none;
+            /* 强力毛玻璃效果 + 稍微增加饱和度让色彩透出来更漂亮 */
+            backdrop-filter: blur(20px) saturate(110%);
+            -webkit-backdrop-filter: blur(20px) saturate(110%);
+            /* 核心：使用遮罩实现渐变。上实下虚，使模糊效果向下逐渐消失 */
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+            -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+            /* 可选：叠加一层极淡的白色，增强玻璃质感 */
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* 底部渐进模糊层 */
+        .blur-overlay-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 40vh; /* 覆盖屏幕底部 40% 区域 */
+            z-index: -1;
+            pointer-events: none;
+            backdrop-filter: blur(20px) saturate(110%);
+            -webkit-backdrop-filter: blur(20px) saturate(110%);
+            /* 核心：下实上虚，使模糊效果向上逐渐消失 */
+            mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+            -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+
+        /* 🃏 滑动容器 */
+        .snap-x-mandatory { scroll-snap-type: x mandatory; }
+        .snap-center { scroll-snap-align: center; }
+        #slider-container { padding: 0 max(calc(50vw - 140px), 1.5rem); } 
+        
+        .card-gradient-1 { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
+        .card-gradient-2 { background: linear-gradient(135deg, #3b82f6 0%, #2dd4bf 100%); }
+        .card-gradient-3 { background: linear-gradient(135deg, #f43f5e 0%, #f59e0b 100%); }
+        .card-gradient-4 { background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); }
+        
+        .spin-trigger { transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .spin-active { transform: rotate(1080deg); }
+
+        /* 📱 底部 Dock - 极致扁平版 */
+        .bottom-dock {
+            flex-shrink: 0;
+            padding-bottom: max(env(safe-area-inset-bottom), 12px);
+            /* 底部 Dock 背景稍微调透明一点，让毛玻璃效果更明显 */
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 50;
+        }
+
+        /* 3D 特效 & 卡片核心 */
+        .widget-card {
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out, filter 0.3s ease-out;
+            transform-origin: center center;
+            opacity: 0.6;
+            transform: scale(0.92);
+            filter: blur(1px);
+        }
+        .widget-card.is-active {
+            opacity: 1;
+            transform: scale(1.05);
+            filter: blur(0px);
+            z-index: 10;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8);
+        }
+
+        .lang-select {
+            appearance: none;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 99px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+            outline: none;
+            text-align: center;
+        }
+        .lang-select option { background: #1e293b; color: white; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="poster-wall-wrapper">
+        <div id="poster-wall-mover">
+            <div id="poster-grid-1" class="poster-grid"></div>
+            <div id="poster-grid-2" class="poster-grid"></div>
+        </div>
+    </div>
+    
+    <div class="blur-overlay-top"></div>
+    <div class="blur-overlay-bottom"></div>
+
+    <div class="absolute top-6 right-6 z-50">
+        <select id="lang-switcher" class="lang-select" onchange="changeLanguage(this.value)">
+            <option value="zh-CN">简体中文</option>
+            <option value="zh-TW">繁體中文</option>
+            <option value="en">English</option>
+        </select>
+    </div>
+
+    <header class="pt-8 px-6 text-center shrink-0 z-10 relative">
+        <div class="relative w-[80px] h-[80px] mx-auto mb-3 group cursor-pointer" onclick="spinAvatar(this)">
+            <div class="absolute -inset-1 bg-[conic-gradient(from_0deg,transparent_0_340deg,white_360deg)] opacity-20 animate-spin-slow rounded-full"></div>
+            <div class="absolute inset-0 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-full blur-md opacity-60"></div>
+            <img src="https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/tubiao/makkawidgets.jpg" 
+                 class="spin-trigger relative w-full h-full rounded-full border-[3px] border-white/90 object-cover z-10 shadow-2xl" 
+                 alt="Avatar">
+        </div>
+        
+        <h1 class="text-2xl font-extrabold tracking-tight mb-1 cursor-pointer select-none active:scale-95 transition-transform" 
+            onclick="randomTitleColor(this)">
+            <span id="title-text" class="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+                MakkaPakka's Widgets
+            </span>
+        </h1>
+        <p id="subtitle" class="text-white/50 text-xs font-medium">左右滑动选择组件</p>
+    </header>
+
+    <main class="flex-grow flex flex-col justify-center relative z-10 min-h-0">
+        <div id="slider-container" 
+             class="flex overflow-x-auto hide-scrollbar snap-x-mandatory gap-5 items-center w-full h-full">
+        </div>
+    </main>
+
+    <div class="bottom-dock w-full z-50 pt-3">
+        <div class="w-full max-w-md mx-auto px-6 grid grid-cols-2 gap-3 mb-2">
+            <button onclick="togglePreview(true)"
+               class="flex items-center justify-center py-2.5 rounded-xl bg-white/10 border border-white/10 text-white font-bold backdrop-blur-md active:scale-95 transition-transform">
+                <i class="fa-solid fa-eye mr-2 text-emerald-400 text-xs"></i>
+                <span id="btn-preview" class="text-xs tracking-wide">导入我的首页</span>
+            </button>
+            
+            <a id="import-all-btn" href="#"
+               class="flex items-center justify-center py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-900/30 active:scale-95 transition-transform">
+                <i class="fa-solid fa-layer-group mr-2 text-xs"></i>
+                <span id="btn-import-all" class="text-xs tracking-wide">导入全部模块</span>
+            </a>
+        </div>
+
+        <div class="w-full flex items-center justify-center gap-3 opacity-60 scale-90 origin-bottom">
+            <div class="text-[10px] text-white/50 font-medium">
+                © 2026 𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖 • Forward
+            </div>
+            <div class="w-px h-2.5 bg-white/20"></div>
+            <a href="https://t.me/makkapakka777" target="_blank"
+               class="flex items-center text-[10px] text-white/50 hover:text-white transition-colors">
+                <i class="fa-brands fa-telegram mr-1"></i>
+                <span id="contact-btn-text">联系作者</span>
+            </a>
+        </div>
+    </div>
+
+    <div id="preview-modal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md hidden opacity-0 transition-opacity duration-300">
+        <div class="relative w-full h-full flex flex-col items-center justify-center p-6" onclick="if(event.target===this) togglePreview(false)">
+            <button onclick="togglePreview(false)" class="absolute top-6 right-6 w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white backdrop-blur">
+                <i class="fa-solid fa-times"></i>
+            </button>
+            <div class="max-w-sm w-full bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
+                <div class="p-4 bg-white/5 backdrop-blur border-b border-white/5 flex justify-between items-center">
+                    <span id="modal-title" class="text-white font-bold">下滑预览</span>
+                    <span class="text-xs text-rose-400 bg-rose-400/10 px-2 py-1 rounded">Forward ≥ 1.3.14</span>
+                </div>
+                <div class="overflow-y-auto flex-1 bg-black/20">
+                    <img src="https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/VIEW3.JPEG" class="w-full h-auto" alt="Preview">
+                </div>
+                <div class="p-4 bg-white/5 backdrop-blur border-t border-white/5">
+                    <a href="https://forward-h5.inch.red/s/makkapakka518" class="block w-full py-3 bg-emerald-500 rounded-xl text-center text-white font-bold shadow-lg shadow-emerald-500/30 active:scale-95 transition-transform">
+                        <span id="modal-btn">确认并导入配置</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 🎬 1. 自定义海报墙逻辑 (Github源)
+        // ==========================================
+        const POSTER_BASE = "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/haibaoqiang/";
+        const TOTAL_POSTERS = 30; // 1.webp 到 30.webp
+
+        function initPosterWall() {
+            const grid1 = document.getElementById('poster-grid-1');
+            const grid2 = document.getElementById('poster-grid-2');
+            
+            // 1. 生成链接列表
+            let posters = [];
+            for (let i = 1; i <= TOTAL_POSTERS; i++) {
+                posters.push(`${POSTER_BASE}${i}.webp`);
+            }
+            
+            // 2. 随机打乱数组 (洗牌算法)
+            posters.sort(() => 0.5 - Math.random());
+
+            // 3. 填充列表以适应滚动高度
+            let displayList = [...posters];
+            while (displayList.length < 48) {
+                displayList = displayList.concat(posters);
+            }
+
+            // 4. 渲染图片
+            const gridHtml = displayList.map(url => 
+                `<img src="${url}" class="poster-img" loading="lazy" alt="Poster">`
+            ).join('');
+
+            grid1.innerHTML = gridHtml;
+            grid2.innerHTML = gridHtml;
+        }
+
+        // ==========================================
+        // 🔧 2. 主要逻辑
+        // ==========================================
+        const i18n = {
+            "zh-CN": { subtitle: "左右滑动选择组件", contact: "联系作者", preview: "导入我的首页", importAll: "导入全部模块", modalTitle: "下滑预览", modalBtn: "确认并导入配置", addBtn: "添加" },
+            "zh-TW": { subtitle: "左右滑動選擇組件", contact: "聯繫作者", preview: "導入我的首頁", importAll: "導入全部模塊", modalTitle: "下滑預覽", modalBtn: "確認並導入配置", addBtn: "添加" },
+            "en": { subtitle: "Swipe to explore widgets", contact: "Contact Author", preview: "Import Homepage", importAll: "Import All Modules", modalTitle: "Preview", modalBtn: "Confirm & Import", addBtn: "Add" }
+        };
+
+        const config = {
+            forwardBase: "https://gocy.pages.dev/#forward://widget?url=",
+            collectionUrl: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets.fwd",
+            widgets: [
+                { id: "anime_omni", icon: "fa-ghost", gradient: "card-gradient-1", version: "2.2.4", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/animeone.js", lang: { "zh-CN": { title: "二次元全境聚合", desc: "多平台动漫榜单聚合" }, "zh-TW": { title: "二次元全境聚合", desc: "多平台動漫榜單聚合" }, "en": { title: "Anime Omni", desc: "Multi-platform Anime Charts" } } },
+                { id: "trakt_cal", icon: "fa-calendar-check", gradient: "card-gradient-3", version: "1.0.8", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/traktkey.js", lang: { "zh-CN": { title: "Trakt 追剧日历", desc: "免Key / 个人中心集成" }, "zh-TW": { title: "Trakt 追劇日曆", desc: "免Key / 個人中心集成" }, "en": { title: "Trakt Calendar", desc: "No-Key / Personal Hub" } } },
+                { id: "variety_hub", icon: "fa-masks-theater", gradient: "card-gradient-2", version: "2.0.3", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/danyi/zongyi.js", lang: { "zh-CN": { title: "全球综艺热度榜", desc: "综艺更新表与热度" }, "zh-TW": { title: "全球綜藝熱度榜", desc: "綜藝更新表與熱度" }, "en": { title: "Variety Hub", desc: "Global Variety Show Trends" } } },
+                { id: "global_tv", icon: "fa-clock", gradient: "card-gradient-4", version: "2.0.9", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/zhuijurili-one.js", lang: { "zh-CN": { title: "全球追剧时刻表", desc: "剧集/综艺/动漫周更" }, "zh-TW": { title: "全球追劇時刻表", desc: "劇集/綜藝/動漫周更" }, "en": { title: "Global TV Schedule", desc: "Weekly TV/Show/Anime" } } },
+                { id: "western_hub", icon: "fa-star", gradient: "card-gradient-1", version: "1.0.2", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/bangdan-one.js", lang: { "zh-CN": { title: "欧美风向标", desc: "烂番茄口碑 & 流媒体热度" }, "zh-TW": { title: "歐美風向標", desc: "爛番茄口碑 & 串流熱度" }, "en": { title: "Western Trends", desc: "Rotten Tomatoes & Streaming" } } },
+                { id: "cinephile", icon: "fa-film", gradient: "card-gradient-2", version: "1.0.3", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/movielist%26interesting.js", lang: { "zh-CN": { title: "影迷宝藏", desc: "系列电影 & 流派探索" }, "zh-TW": { title: "影迷寶藏", desc: "系列電影 & 流派探索" }, "en": { title: "Cinephile Gems", desc: "Series Collections & Genres" } } },
+                { id: "discover", icon: "fa-compass", gradient: "card-gradient-3", version: "1.0.4", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/today-one.js", lang: { "zh-CN": { title: "探索发现", desc: "今天看什么 / 那年今日" }, "zh-TW": { title: "探索發現", desc: "今天看什麼 / 那年今日" }, "en": { title: "Discovery", desc: "What to Watch / On This Day" } } },
+                { id: "media_hub", icon: "fa-network-wired", gradient: "card-gradient-4", version: "1.2.1", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/cn-int-bangdan.js", lang: { "zh-CN": { title: "全球影视聚合", desc: "Trakt / 豆瓣 / 平台分流" }, "zh-TW": { title: "全球影視聚合", desc: "Trakt / 豆瓣 / 平台分流" }, "en": { title: "Media Aggregator", desc: "Trakt / Douban / Platforms" } } },
+                { id: "platform", icon: "fa-tv", gradient: "card-gradient-1", version: "1.0.5", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/zhijiyong-myself/pingtai.js", lang: { "zh-CN": { title: "流媒体独家", desc: "Netflix/HBO/B站自制" }, "zh-TW": { title: "串流獨家", desc: "Netflix/HBO/B站自製" }, "en": { title: "Originals", desc: "Netflix/HBO/Bilibili etc." } } },
+                { id: "danmu", icon: "fa-comments", gradient: "card-gradient-2", version: "1.1.3", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/danmuapi-ProMax.js", lang: { "zh-CN": { title: "弹幕 Pro", desc: "多源API & 繁简转换" }, "zh-TW": { title: "彈幕 Pro", desc: "多源API & 繁簡轉換" }, "en": { title: "Danmu Pro", desc: "Multi-Source API & Convert" } } },
+                { id: "imdb", icon: "fa-ranking-star", gradient: "card-gradient-3", version: "1.0.3", url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/imdb%26cn.js", lang: { "zh-CN": { title: "IMDb 热榜", desc: "全球权威影视热榜" }, "zh-TW": { title: "IMDb 熱榜", desc: "全球權威影視熱榜" }, "en": { title: "IMDb Charts", desc: "Global Top Trending" } } }
+            ]
+        };
+
+        let currentLang = 'zh-CN';
+        document.getElementById('import-all-btn').href = config.forwardBase + encodeURIComponent(config.collectionUrl);
+        const slider = document.getElementById('slider-container');
+
+        function renderWidgets() {
+            slider.innerHTML = ''; 
+            config.widgets.forEach((w, i) => {
+                const gradientClass = `card-gradient-${(i % 4) + 1}`;
+                const link = config.forwardBase + encodeURIComponent(w.url);
+                const txt = w.lang[currentLang] || w.lang['zh-CN'];
+                
+                const card = `
+                    <div class="snap-center widget-card shrink-0 w-[64vw] sm:w-[280px] h-[300px] relative rounded-[1.8rem] overflow-hidden flex flex-col group active:scale-95">
+                        <div class="absolute inset-0 ${gradientClass} opacity-90"></div>
+                        <div class="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+                        
+                        <div class="relative z-10 h-full p-6 flex flex-col justify-between text-white">
+                            <div>
+                                <div class="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xl mb-4 shadow-lg border border-white/20">
+                                    <i class="fa-solid ${w.icon}"></i>
+                                </div>
+                                <h3 class="text-xl font-bold leading-tight mb-2 drop-shadow-md">${txt.title}</h3>
+                                <p class="text-white/80 text-xs font-medium leading-relaxed line-clamp-3">${txt.desc}</p>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-4">
+                                    <span class="text-[10px] font-mono bg-black/20 px-2 py-0.5 rounded-md">v${w.version}</span>
+                                </div>
+                                <a href="${link}" class="flex items-center justify-center w-full py-3 bg-white text-slate-900 rounded-xl font-bold shadow-xl hover:bg-slate-100 transition-colors text-sm">
+                                    <i class="fa-solid fa-plus mr-2 text-[10px]"></i> ${i18n[currentLang].addBtn}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                slider.innerHTML += card;
+            });
+            updateSliderEffect();
+        }
+
+        function changeLanguage(lang) {
+            currentLang = lang;
+            const t = i18n[lang];
+            document.getElementById('subtitle').innerText = t.subtitle;
+            document.getElementById('contact-btn-text').innerText = t.contact;
+            document.getElementById('btn-preview').innerText = t.preview;
+            document.getElementById('btn-import-all').innerText = t.importAll;
+            document.getElementById('modal-title').innerText = t.modalTitle;
+            document.getElementById('modal-btn').innerText = t.modalBtn;
+            renderWidgets();
+        }
+
+        function updateSliderEffect() {
+            const container = slider;
+            const center = container.scrollLeft + container.offsetWidth / 2;
+            const cards = document.querySelectorAll('.widget-card');
+            cards.forEach(card => {
+                const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+                const distance = Math.abs(center - cardCenter);
+                if (distance < container.offsetWidth * 0.35) card.classList.add('is-active');
+                else card.classList.remove('is-active');
+            });
+        }
+        slider.addEventListener('scroll', updateSliderEffect);
+        
+        renderWidgets();
+        initPosterWall(); 
+        setTimeout(updateSliderEffect, 100);
+
+        function spinAvatar(el) {
+            const img = el.querySelector('img');
+            img.classList.remove('spin-active'); void img.offsetWidth; img.classList.add('spin-active');
+            if(navigator.vibrate) navigator.vibrate(50);
+        }
+
+        function randomTitleColor(el) {
+            const text = document.getElementById('title-text');
+            const colors = ['from-blue-400 to-purple-400', 'from-green-400 to-cyan-400', 'from-yellow-400 to-red-400', 'from-pink-400 to-rose-400'];
+            text.className = `bg-clip-text text-transparent bg-gradient-to-r ${colors[Math.floor(Math.random() * colors.length)]} transition-all duration-500`;
+        }
+
+        function togglePreview(show) {
+            const modal = document.getElementById('preview-modal');
+            if (show) { modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10); }
+            else { modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); }
+        }
+    </script>
+</body>
+</html>
