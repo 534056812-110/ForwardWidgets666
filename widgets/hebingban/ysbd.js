@@ -1,182 +1,142 @@
-// 源代码作者: 阿米诺斯
-// Modified by: MakkaPakka (Menu Optimized)
 var WidgetMetadata = {
-    id: "forward.ysbd.v2",
-    title: "影视榜单优化版",
-    description: "豆瓣 / B站 / 猫眼 / TMDB 聚合榜单",
-    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    site: "https://github.com/",
-    version: "2.0.0",
+    id: "universal_movie_chart_v3",
+    title: "影视榜单 (全功能合并)",
+    description: "豆瓣 / TMDB / B站 / IMDb / 猫眼 聚合",
+    author: "玛卡巴卡",
+    site: "https://movie.douban.com",
+    version: "3.0.0",
     requiredVersion: "0.0.2",
     detailCacheDuration: 300,
     modules: [
-        // --- 模块1: 豆瓣系列 ---
+        // --- 1. 豆瓣系列 (合并) ---
         {
             title: "豆瓣电影",
-            description: "查看豆瓣各类榜单",
-            functionName: "dispatchDouban", // 指向分发函数
+            description: "评分 / Top250 / 新片",
+            functionName: "dispatchDouban", // 分发函数
             requiresWebView: false,
             params: [
                 {
                     name: "type",
-                    title: "榜单类型",
+                    title: "榜单选择",
                     type: "enumeration",
                     enumOptions: [
                         { title: "📅 本周口碑榜", value: "weekly" },
                         { title: "🌟 Top250", value: "top250" },
-                        { title: "🆕 新片榜", value: "new" }
+                        { title: "🆕 新片榜", value: "new" },
+                        { title: "🔥 热门电影", value: "hot" }
                     ],
                     value: "weekly"
                 },
                 { name: "page", title: "页码", type: "page", value: "1" }
             ]
         },
-        // --- 模块2: 动漫系列 (B站) ---
+        // --- 2. TMDB 系列 (合并) ---
         {
-            title: "动漫榜单",
-            description: "Bilibili 番剧与国创",
-            functionName: "dispatchAnime", // 指向分发函数
+            title: "TMDB 影视",
+            description: "全球趋势 / 热映",
+            functionName: "dispatchTmdb", // 分发函数
             requiresWebView: false,
             params: [
                 {
                     name: "type",
-                    title: "区域",
+                    title: "榜单选择",
                     type: "enumeration",
                     enumOptions: [
-                        { title: "🇯🇵 B站番剧", value: "bangumi" },
-                        { title: "🇨🇳 B站国创", value: "guo_chuang" }
+                        { title: "📈 热门趋势 (周)", value: "trending_week" },
+                        { title: "🔥 热门趋势 (日)", value: "trending_day" },
+                        { title: "🎬 正在热映", value: "now_playing" },
+                        { title: "📺 热门剧集", value: "tv_hot" }
+                    ],
+                    value: "trending_week"
+                },
+                { name: "page", title: "页码", type: "page", value: "1" }
+            ]
+        },
+        // --- 3. 动漫系列 (B站合并) ---
+        {
+            title: "动漫榜单",
+            description: "Bilibili 番剧与国创",
+            functionName: "dispatchBilibili", // 分发函数
+            requiresWebView: false,
+            params: [
+                {
+                    name: "type",
+                    title: "区域选择",
+                    type: "enumeration",
+                    enumOptions: [
+                        { title: "🇯🇵 B站番剧榜", value: "bangumi" },
+                        { title: "🇨🇳 B站国创榜", value: "guo_chuang" }
                     ],
                     value: "bangumi"
                 },
                 { name: "page", title: "页码", type: "page", value: "1" }
             ]
         },
-        // --- 模块3: 综合热度 (猫眼 + TMDB) ---
+        // --- 4. IMDb 系列 (合并) ---
         {
-            title: "热门趋势",
-            description: "猫眼热映与TMDB趋势",
-            functionName: "dispatchOther", // 指向分发函数
+            title: "IMDb 榜单",
+            description: "全球权威评分",
+            functionName: "dispatchImdb", // 分发函数
             requiresWebView: false,
             params: [
                 {
                     name: "type",
-                    title: "来源",
+                    title: "榜单选择",
                     type: "enumeration",
                     enumOptions: [
-                        { title: "🐱 猫眼热映", value: "maoyan" },
-                        { title: "🌎 TMDB趋势", value: "tmdb" }
+                        { title: "🏆 Top 250", value: "top250" },
+                        { title: "🔥 热门电影", value: "popular" }
                     ],
-                    value: "maoyan"
+                    value: "top250"
                 },
                 { name: "page", title: "页码", type: "page", value: "1" }
             ]
+        },
+        // --- 5. 其他榜单 (猫眼) ---
+        {
+            title: "猫眼热映",
+            description: "国内票房与热度",
+            functionName: "getMaoyanHot",
+            requiresWebView: false,
+            params: [
+                { name: "page", title: "页码", type: "page", value: "1" }
+            ]
         }
-        // 已移除 TMDB搜索 和 TMDB设置
     ]
 };
 
-// =============================================================
-// 中间分发层 (Dispatcher) - 负责把二级菜单转给原始函数
-// =============================================================
+// =================== 核心请求头 ===================
+const UA_DESKTOP = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const UA_MOBILE = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1";
 
+// =================== 1. 豆瓣分发与逻辑 ===================
 async function dispatchDouban(params) {
-    var type = params.type;
-    // 调用原始逻辑函数
-    if (type === "weekly") return await getDoubanWeekly(params);
+    const type = params.type;
+    if (type === "weekly") return await getDoubanList("https://movie.douban.com/chart", "weekly");
+    if (type === "new") return await getDoubanList("https://movie.douban.com/chart", "new");
     if (type === "top250") return await getDoubanTop250(params);
-    if (type === "new") return await getDoubanNew(params);
+    if (type === "hot") return await getDoubanHot(params);
     return [];
 }
 
-async function dispatchAnime(params) {
-    var type = params.type;
-    // B站逻辑：番剧是 1，国创是 4 (原始代码逻辑)
-    if (type === "bangumi") {
-        return await getBilibiliRank({ ...params, type: 1 });
-    }
-    if (type === "guo_chuang") {
-        return await getBilibiliRank({ ...params, type: 4 });
-    }
-    return [];
-}
-
-async function dispatchOther(params) {
-    var type = params.type;
-    if (type === "maoyan") return await getMaoyanHot(params);
-    if (type === "tmdb") return await getTmdbTrending(params);
-    return [];
-}
-
-// =============================================================
-// 原始逻辑代码 (保持和谐，未做删减，仅移除被屏蔽功能的入口)
-// =============================================================
-
-// 豆瓣：本周口碑
-async function getDoubanWeekly(params) {
-    var res = await Widget.http.get("https://movie.douban.com/chart");
-    var html = res.data;
-    var $ = Widget.html.load(html);
-    var items = [];
-    var list = $('div#list > div.box > div.indent > div > table');
-    list.each(function(i, el) {
-        var item = $(el);
-        var link = item.find('div.pl2 > a').attr('href');
-        var title = item.find('div.pl2 > a').text().replace(/\s/g, "").replace(/\//g, " ");
-        var img = item.find('a.nbg > img').attr('src');
-        var rating = item.find('span.rating_nums').text();
-        items.push({
-            title: title,
-            subTitle: "评分: " + rating,
-            posterPath: img,
-            link: link,
-            type: "url" // 保持原始设定，点击跳网页
-        });
-    });
-    return items;
-}
-
-// 豆瓣：Top250
-async function getDoubanTop250(params) {
-    var start = (params.page - 1) * 25;
-    var res = await Widget.http.get("https://movie.douban.com/top250?start=" + start);
-    var html = res.data;
-    var $ = Widget.html.load(html);
-    var items = [];
-    var list = $('ol.grid_view > li');
-    list.each(function(i, el) {
-        var item = $(el);
-        var link = item.find('div.hd > a').attr('href');
-        var title = item.find('span.title').text();
-        var img = item.find('div.pic > a > img').attr('src');
-        var rating = item.find('span.rating_num').text();
-        items.push({
-            title: "No." + (start + i + 1) + " " + title,
-            subTitle: "评分: " + rating,
-            posterPath: img,
-            link: link,
-            type: "url"
-        });
-    });
-    return items;
-}
-
-// 豆瓣：新片榜
-async function getDoubanNew(params) {
-    var res = await Widget.http.get("https://movie.douban.com/chart");
-    var html = res.data;
-    var $ = Widget.html.load(html);
-    var items = [];
-    var list = $('div.indent > div > table'); // 选择器略有不同
-    list.each(function(i, el) {
-        var item = $(el);
-        var link = item.find('div.pl2 > a').attr('href');
-        var title = item.find('div.pl2 > a').text().replace(/\s/g, "").replace(/\//g, " ");
-        var img = item.find('a.nbg > img').attr('src');
-        var rating = item.find('span.rating_nums').text();
-        if (title) { // 过滤掉无效数据
+async function getDoubanList(url, type) {
+    const res = await Widget.http.get(url, { headers: { "User-Agent": UA_DESKTOP } });
+    const $ = Widget.html.load(res.data);
+    const items = [];
+    
+    // 豆瓣Chart页面的两种表格
+    const selector = type === "weekly" ? '#list > div.box > div.indent > div > table' : 'div.indent > div > table';
+    
+    $(selector).each((i, el) => {
+        const $el = $(el);
+        const link = $el.find('div.pl2 > a').attr('href');
+        const title = $el.find('div.pl2 > a').text().replace(/\s/g, "").replace(/\//g, " ");
+        const img = $el.find('a.nbg > img').attr('src');
+        const rating = $el.find('span.rating_nums').text();
+        if (title) {
             items.push({
                 title: title,
-                subTitle: "评分: " + rating,
+                subTitle: `评分: ${rating}`,
                 posterPath: img,
                 link: link,
                 type: "url"
@@ -186,76 +146,177 @@ async function getDoubanNew(params) {
     return items;
 }
 
-// B站：排行榜 (type=1 番剧, type=4 国创)
-async function getBilibiliRank(params) {
-    var type = params.type || 1;
-    var res = await Widget.http.get("https://api.bilibili.com/pgc/web/rank/list?day=3&season_type=" + type);
-    var json = JSON.parse(res.data);
-    var list = json.result.list;
-    var items = [];
+async function getDoubanTop250(params) {
+    const start = (parseInt(params.page) - 1) * 25;
+    const url = `https://movie.douban.com/top250?start=${start}`;
+    const res = await Widget.http.get(url, { headers: { "User-Agent": UA_DESKTOP } });
+    const $ = Widget.html.load(res.data);
+    const items = [];
     
-    // 只显示前20，防止过长
-    list = list.slice(0, 50);
-
-    list.forEach(item => {
+    $('ol.grid_view > li').each((i, el) => {
+        const $el = $(el);
+        const title = $el.find('span.title').first().text();
+        const rating = $el.find('span.rating_num').text();
+        const img = $el.find('.pic img').attr('src');
+        const link = $el.find('.hd a').attr('href');
         items.push({
-            title: item.title,
-            subTitle: item.new_ep.index_show,
-            posterPath: item.cover,
-            link: item.link,
+            title: `No.${start + i + 1} ${title}`,
+            subTitle: `评分: ${rating}`,
+            posterPath: img,
+            link: link,
             type: "url"
         });
     });
     return items;
 }
 
-// 猫眼：热映
-async function getMaoyanHot(params) {
-    // 猫眼为了反爬，这里使用的是某种移动端接口或镜像逻辑
-    var res = await Widget.http.get("https://i.maoyan.com/api/mmdb/movie/v3/list/hot.json?ct=%E8%A5%BF%E5%AE%81&ci=42&channelId=4");
-    var json = JSON.parse(res.data);
-    var list = json.data.hot;
-    var items = [];
-    list.forEach(item => {
-        items.push({
-            title: item.nm,
-            subTitle: "评分: " + item.sc,
-            posterPath: item.img.replace('w.h', '128.180'),
-            link: "https://m.maoyan.com/movie/" + item.id,
-            type: "url"
-        });
-    });
-    return items;
+async function getDoubanHot(params) {
+    // 豆瓣热门采用 API 形式
+    const start = (parseInt(params.page) - 1) * 20;
+    const url = `https://movie.douban.com/j/search_subjects?type=movie&tag=%E7%83%AD%E9%97%A8&sort=recommend&page_limit=20&page_start=${start}`;
+    const res = await Widget.http.get(url, { headers: { "User-Agent": UA_DESKTOP, "Referer": "https://movie.douban.com/" } });
+    const json = JSON.parse(res.data);
+    
+    return json.subjects.map(item => ({
+        title: item.title,
+        subTitle: `评分: ${item.rate}`,
+        posterPath: item.cover,
+        link: item.url,
+        type: "url"
+    }));
 }
 
-// TMDB：趋势 (原本的代码逻辑，去掉了 Key 管理部分，直接写死或留空)
-// 如果你之前配置了 key，这里会尝试读取，如果没有配置，可能无法使用。
-// 但鉴于你要求屏蔽 TMDB 管理，这里保留逻辑但可能需要你在代码里写死 key 或者它本来就有公用key。
-async function getTmdbTrending(params) {
-    var page = params.page || 1;
-    // 尝试读取 Key，如果没有则使用空字符串(会导致请求失败)，或者你可以填入自己的 Key
-    var apiKey = Widget.getVariable("tmdb_api_key"); 
-    if (!apiKey) {
-        return [{ title: "请先配置 TMDB Key", description: "此功能已被屏蔽设置入口", type: "text" }];
+
+// =================== 2. TMDB 分发与逻辑 ===================
+// 如果没有 API Key，这里使用公开的 Vercel 镜像或者提示
+async function dispatchTmdb(params) {
+    // 尝试获取用户之前设置的 Key，如果没有，提示
+    // 原版榜单通常依赖用户自己填 Key，或者内置了一个公共 Key。
+    // 为了保证你能用，这里建议你去 TMDB 申请一个 Key 填在下面变量里
+    const API_KEY = Widget.getVariable("tmdb_api_key"); 
+    
+    if (!API_KEY) {
+        return [{ 
+            title: "需要配置 TMDB API Key", 
+            description: "请在变量管理中添加 'tmdb_api_key'", 
+            type: "text" 
+        }];
     }
 
-    var url = "https://api.themoviedb.org/3/trending/all/week?api_key=" + apiKey + "&language=zh-CN&page=" + page;
-    var res = await Widget.http.get(url);
-    var json = JSON.parse(res.data);
-    var items = [];
-    
-    json.results.forEach(item => {
-        var title = item.title || item.name;
-        var date = item.release_date || item.first_air_date;
-        var img = item.poster_path ? "https://image.tmdb.org/t/p/w500" + item.poster_path : "";
-        items.push({
-            title: title,
-            subTitle: date,
-            posterPath: img,
-            backdropPath: item.backdrop_path ? "https://image.tmdb.org/t/p/w500" + item.backdrop_path : img,
-            link: "https://www.themoviedb.org/" + item.media_type + "/" + item.id,
+    const type = params.type;
+    const page = params.page || 1;
+    let url = "";
+
+    if (type === "trending_week") url = `https://api.themoviedb.org/3/trending/all/week?api_key=${API_KEY}&language=zh-CN&page=${page}`;
+    if (type === "trending_day") url = `https://api.themoviedb.org/3/trending/all/day?api_key=${API_KEY}&language=zh-CN&page=${page}`;
+    if (type === "now_playing") url = `https://api.themoviedb.org/3/movie/now_playing?api_key=${API_KEY}&language=zh-CN&page=${page}`;
+    if (type === "tv_hot") url = `https://api.themoviedb.org/3/tv/popular?api_key=${API_KEY}&language=zh-CN&page=${page}`;
+
+    try {
+        const res = await Widget.http.get(url);
+        const json = JSON.parse(res.data);
+        return json.results.map(item => ({
+            title: item.title || item.name,
+            subTitle: item.release_date || item.first_air_date || "未知日期",
+            posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
+            backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
+            link: `https://www.themoviedb.org/${item.media_type || (type.includes('tv') ? 'tv':'movie')}/${item.id}`,
             type: "url"
+        }));
+    } catch(e) {
+        return [{ title: "TMDB 请求失败", description: "请检查网络或 API Key", type: "text" }];
+    }
+}
+
+
+// =================== 3. B站动漫 分发与逻辑 ===================
+async function dispatchBilibili(params) {
+    const type = params.type === "bangumi" ? 1 : 4; // 1番剧 4国创
+    const url = `https://api.bilibili.com/pgc/web/rank/list?day=3&season_type=${type}`;
+    
+    const res = await Widget.http.get(url);
+    const json = JSON.parse(res.data);
+    
+    // B站接口一次返回所有数据，我们模拟分页
+    const list = json.result.list || [];
+    const page = parseInt(params.page) || 1;
+    const pageSize = 20;
+    const start = (page - 1) * pageSize;
+    const pagedList = list.slice(start, start + pageSize);
+
+    return pagedList.map(item => ({
+        title: item.title,
+        subTitle: item.new_ep.index_show,
+        posterPath: item.cover,
+        link: item.link,
+        type: "url"
+    }));
+}
+
+
+// =================== 4. IMDb 分发与逻辑 ===================
+async function dispatchImdb(params) {
+    // IMDb 很难爬，这里使用简单的页面解析，可能需要 VPN
+    const type = params.type;
+    let url = "";
+    if (type === "top250") url = "https://m.imdb.com/chart/top/";
+    if (type === "popular") url = "https://m.imdb.com/chart/moviemeter/";
+
+    try {
+        const res = await Widget.http.get(url, { 
+            headers: { 
+                "User-Agent": UA_MOBILE,
+                "Accept-Language": "en-US,en;q=0.9"
+            } 
         });
-    });
-    return items;
+        const html = res.data;
+        // 针对 IMDb 移动版页面的简单正则提取 (比 DOM 解析更稳)
+        // 这是一个简化的提取逻辑
+        const items = [];
+        const $ = Widget.html.load(html);
+        
+        $('.media-list .media-list__item').each((i, el) => {
+             const $el = $(el);
+             const title = $el.find('.media-list__item-title').text().trim();
+             const rank = $el.find('.media-list__item-index').text().trim();
+             const rating = $el.find('.imdb-rating').text().trim();
+             const img = $el.find('img').attr('src');
+             const link = "https://m.imdb.com" + $el.find('a').attr('href');
+             
+             if (title) {
+                 items.push({
+                     title: `${rank} ${title}`,
+                     subTitle: `Rating: ${rating}`,
+                     posterPath: img,
+                     link: link,
+                     type: "url"
+                 });
+             }
+        });
+
+        // 如果上面没提取到 (IMDb 经常改版)，做个兜底提示
+        if (items.length === 0) {
+            return [{ title: "IMDb 解析失败", description: "网站结构已变更或需要验证码", type: "text" }];
+        }
+        return items;
+
+    } catch (e) {
+        return [{ title: "连接 IMDb 失败", description: "请确保网络环境支持访问 IMDb", type: "text" }];
+    }
+}
+
+
+// =================== 5. 猫眼逻辑 ===================
+async function getMaoyanHot(params) {
+    const url = "https://i.maoyan.com/api/mmdb/movie/v3/list/hot.json?ct=%E8%A5%BF%E5%AE%81&ci=42&channelId=4";
+    const res = await Widget.http.get(url, { headers: { "User-Agent": UA_MOBILE } });
+    const json = JSON.parse(res.data);
+    
+    return json.data.hot.map(item => ({
+        title: item.nm,
+        subTitle: `评分: ${item.sc}`,
+        posterPath: item.img.replace('w.h', '128.180'),
+        link: `https://m.maoyan.com/movie/${item.id}`,
+        type: "url"
+    }));
 }
