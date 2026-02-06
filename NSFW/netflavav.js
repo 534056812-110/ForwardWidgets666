@@ -1,37 +1,37 @@
 var WidgetMetadata = {
-    id: "netflav_pro",
+    id: "netflav_fixed",
     title: "Netflav",
-    description: "\u6d4f\u89c8 Netflav \u7cbe\u9009\u5f71\u7247", // "浏览 Netflav 精选影片"
+    description: "\u6d4f\u89c8 Netflav \u7cbe\u9009\u5f71\u7247",
     author: "Forward_User",
     site: "https://netflav.com",
-    version: "1.0.0",
+    version: "1.1.0",
     requiredVersion: "0.0.2",
     detailCacheDuration: 300,
     modules: [
         {
-            title: "\u641c\u7d22\u5f71\u7247", // "搜索影片"
-            description: "\u641c\u7d22\u756a\u53f7\u6216\u5173\u952e\u8bcd", // "搜索番号或关键词"
+            title: "\u641c\u7d22\u5f71\u7247",
+            description: "\u641c\u7d22\u756a\u53f7\u6216\u5173\u952e\u8bcd",
             functionName: "searchVideos",
             requiresWebView: false,
             params: [
                 {
                     name: "keyword",
-                    title: "\u5173\u952e\u8bcd", // "关键词"
+                    title: "\u5173\u952e\u8bcd",
                     type: "input",
-                    description: "\u8f93\u5165\u756a\u53f7", // "输入番号"
+                    description: "\u8f93\u5165\u756a\u53f7",
                 },
                 { name: "page", title: "\u9875\u7801", type: "page", value: "1" }
             ]
         },
         {
-            title: "\u6700\u65b0\u66f4\u65b0", // "最新更新"
-            description: "\u67e5\u770b\u6700\u65b0\u53d1\u5e03\u7684\u5f71\u7247", // "查看最新发布的影片"
+            title: "\u6700\u65b0\u66f4\u65b0",
+            description: "\u67e5\u770b\u6700\u65b0\u53d1\u5e03\u7684\u5f71\u7247",
             functionName: "loadPage",
             requiresWebView: false,
             params: [
                 { 
                     name: "url", 
-                    title: "\u7c7b\u578b", // "类型"
+                    title: "\u7c7b\u578b", 
                     type: "constant", 
                     value: "https://netflav.com/browse" 
                 },
@@ -39,14 +39,14 @@ var WidgetMetadata = {
             ]
         },
         {
-            title: "\u70ed\u95e8\u5f71\u7247", // "热门影片"
-            description: "\u67e5\u770b\u70ed\u95e8\u6392\u884c", // "查看热门排行"
+            title: "\u70ed\u95e8\u5f71\u7247",
+            description: "\u67e5\u770b\u70ed\u95e8\u6392\u884c",
             functionName: "loadPage",
             requiresWebView: false,
             params: [
                 { 
                     name: "url", 
-                    title: "\u7c7b\u578b", // "类型"
+                    title: "\u7c7b\u578b", 
                     type: "constant", 
                     value: "https://netflav.com/trending" 
                 },
@@ -57,7 +57,7 @@ var WidgetMetadata = {
 };
 
 // =============================================================
-// 核心功能区
+// 核心逻辑
 // =============================================================
 
 const HEADERS = {
@@ -65,49 +65,46 @@ const HEADERS = {
     "Referer": "https://netflav.com/"
 };
 
-// --- 功能 1: 搜索 ---
 async function searchVideos(params) {
     var keyword = params.keyword;
     var page = params.page || 1;
-    // Netflav 的搜索 URL 结构
     var url = `https://netflav.com/search?keyword=${encodeURIComponent(keyword)}&page=${page}`;
-    
     var response = await Widget.http.get(url, { headers: HEADERS });
     return parseHtml(response.data);
 }
 
-// --- 功能 2: 加载列表 ---
 async function loadPage(params) {
     var url = params.url || "https://netflav.com/browse";
     var page = params.page || 1;
-
-    // 处理分页
     if (url.includes('?')) {
         url = `${url}&page=${page}`;
     } else {
         url = `${url}?page=${page}`;
     }
-
     var response = await Widget.http.get(url, { headers: HEADERS });
     return parseHtml(response.data);
 }
 
-// --- 核心解析器: 混合模式 (JSON + DOM) ---
+// 辅助函数：处理图片链接（解决不显示问题）
+function fixImageUrl(url) {
+    if (!url) return "";
+    if (url.startsWith("http")) return url;
+    // 如果是相对路径，补全域名
+    return "https://netflav.com" + url;
+}
+
 async function parseHtml(html) {
     var items = [];
     
-    // 策略 A: 尝试解析 Next.js 的 JSON 数据 (最高效)
-    // Netflav 是 React 网站，数据通常在 <script id="__NEXT_DATA__"> 里
+    // 策略 A: JSON 解析 (优先)
     try {
         var jsonMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
         if (jsonMatch && jsonMatch[1]) {
             var jsonData = JSON.parse(jsonMatch[1]);
-            // 深入查找 docs 或 videos 数组
-            // 路径通常是 props.pageProps.initialState.xxx.docs
             var state = jsonData.props.pageProps.initialState;
             var docs = [];
             
-            // 遍历查找包含 docs 的对象
+            // 遍历查找 docs 数组
             if (state) {
                 Object.keys(state).forEach(key => {
                     if (state[key] && state[key].docs) {
@@ -116,48 +113,45 @@ async function parseHtml(html) {
                 });
             }
 
-            // 如果找到了 JSON 数据，直接映射
             if (docs.length > 0) {
                 docs.forEach(doc => {
+                    // 获取图片，优先用 preview，没有则用 thumb
+                    var rawImg = doc.preview_url || doc.preview || doc.thumb || "";
+                    var fullImg = fixImageUrl(rawImg);
+
                     items.push({
                         id: "https://netflav.com/video?id=" + doc.videoId,
                         type: "movie",
                         title: doc.title,
                         link: "https://netflav.com/video?id=" + doc.videoId,
-                        posterPath: doc.preview_url || doc.preview, // 封面
-                        backdropPath: doc.preview_url || doc.preview,
-                        releaseDate: doc.sourceDate || "",
+                        posterPath: fullImg,  // 使用修复后的图片地址
+                        backdropPath: fullImg,
+                        releaseDate: doc.sourceDate ? doc.sourceDate.split('T')[0] : "",
                         playerType: "system"
                     });
                 });
-                return items; // 如果成功，直接返回，不再进行 DOM 解析
+                return items;
             }
         }
     } catch (e) {
-        // JSON 解析失败，静默回退到 DOM 解析
-        console.log("JSON Parse Failed, fallback to DOM");
+        console.log("JSON Parse Failed");
     }
 
-    // 策略 B: DOM 解析 (Cheerio)
+    // 策略 B: DOM 解析 (备用)
     var $ = Widget.html.load(html);
-    
-    // 查找所有 grid item
-    // Netflav 的 grid 结构通常包含 'grid' 类
     $('div[class*="grid"] > div').each((i, el) => {
         var $el = $(el);
         var $link = $el.find('a').first();
-        
         if ($link.length > 0) {
             var href = $link.attr('href');
-            // 补全链接
-            if (href && !href.startsWith('http')) {
-                href = "https://netflav.com" + href;
-            }
+            if (href && !href.startsWith('http')) href = "https://netflav.com" + href;
 
             var title = $el.find('.title').text() || $el.find('div[class*="title"]').text();
-            // 封面图通常在 img src 或 style background-image
             var img = $el.find('img').attr('src');
             
+            // 补全 DOM 解析出来的图片
+            img = fixImageUrl(img);
+
             if (href && title) {
                 items.push({
                     id: href,
@@ -176,54 +170,59 @@ async function parseHtml(html) {
     return items;
 }
 
-// --- 功能 3: 详情页与播放 ---
 async function loadDetail(link) {
     try {
         var response = await Widget.http.get(link, { headers: HEADERS });
         var html = response.data;
         var m3u8Url = "";
+        var title = "";
+        var poster = "";
 
-        // 策略 1: 正则提取 .m3u8
-        var match = html.match(/(https?:\/\/[^"']+\.m3u8[^"']*)/);
-        if (match) {
-            m3u8Url = match[1];
+        // 1. 尝试从 JSON 获取所有详情信息
+        var jsonMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+        if (jsonMatch && jsonMatch[1]) {
+            try {
+                var data = JSON.parse(jsonMatch[1]);
+                var videoData = data.props.pageProps.initialState.video.data;
+                
+                if (videoData) {
+                    title = videoData.title;
+                    m3u8Url = videoData.src || videoData.videoUrl; 
+                    poster = fixImageUrl(videoData.preview || videoData.thumb);
+                }
+            } catch(e) {}
+        }
+
+        // 2. 如果 JSON 没拿到 m3u8，尝试正则提取
+        if (!m3u8Url) {
+            var match = html.match(/(https?:\/\/[^"']+\.m3u8[^"']*)/);
+            if (match) {
+                m3u8Url = match[1];
+            }
         }
         
-        // 策略 2: 如果找不到，查找 JSON 里的 videoUrl
+        // 3. 还是没有？尝试查找 video 标签
         if (!m3u8Url) {
-             var jsonMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-             if (jsonMatch && jsonMatch[1]) {
-                 var data = JSON.parse(jsonMatch[1]);
-                 // 尝试定位 video 数据
-                 // 路径可能是 props.pageProps.initialState.video.data
-                 try {
-                     var videoData = data.props.pageProps.initialState.video.data;
-                     if (videoData && videoData.src) {
-                         m3u8Url = videoData.src;
-                     }
-                 } catch(e) {}
-             }
+             var $ = Widget.html.load(html);
+             m3u8Url = $('video').attr('src') || $('source').attr('src');
+             if (!title) title = $('h1').text().trim();
         }
-
-        // 获取标题和封面用于展示
-        var $ = Widget.html.load(html);
-        var title = $('h1').text().trim() || "Netflav Video";
-        // 尝试获取封面
-        var poster = $('meta[property="og:image"]').attr('content') || "";
 
         return {
             id: link,
             type: "detail",
-            videoUrl: m3u8Url || link, // 找到就播，找不到就给网页链接
-            title: title,
-            description: "\u756a\u53f7: " + title, // "番号: "
+            videoUrl: m3u8Url || link,
+            title: title || "Netflav Video",
+            description: "\u756a\u53f7: " + title,
             posterPath: poster,
             backdropPath: poster,
             mediaType: "movie",
             playerType: "system",
+            // 【关键修改】这里将 Referer 传递给播放器
             customHeaders: {
-                "Referer": "https://netflav.com/",
-                "User-Agent": HEADERS["User-Agent"]
+                "Referer": "https://netflav.com/", // 必须有这个，否则无法播放
+                "User-Agent": HEADERS["User-Agent"],
+                "Origin": "https://netflav.com"
             }
         };
 
