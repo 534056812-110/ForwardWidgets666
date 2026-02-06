@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖's 𝙒𝙞𝙙𝙜𝙚𝙩𝙨</title>
+    
+    <link rel="icon" href="https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/main/icon.png" type="image/png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Outfit"', '-apple-system', 'sans-serif'],
+                    },
+                    animation: {
+                        'spin-slow': 'spin 8s linear infinite',
+                        'wall-scroll': 'wallScroll 60s linear infinite alternate',
+                    },
+                    keyframes: {
+                        wallScroll: {
+                            '0%': { transform: 'translateY(0)' },
+                            '100%': { transform: 'translateY(-20%)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* 🌌 基础设置 */
+        body {
+            background-color: #050505;
+            /* 移除原来的渐变背景，改用黑色底色 */
+            color: white;
+            height: 100vh;
+            overflow: hidden; /* 防止整个页面滚动 */
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* 🎬 海报墙特效 */
+        #poster-wall-container {
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            z-index: -1;
+            transform: rotate(-12deg); /* 整体倾斜角度，模仿你的截图 */
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .poster-column {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        /* 海报图片样式 */
+        .poster-img {
+            width: 100%;
+            border-radius: 8px;
+            opacity: 0.6; /* 降低不透明度 */
+            transition: opacity 0.3s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            filter: grayscale(30%); /* 稍微灰度，显得更有质感 */
+        }
+
+        /* 遮罩层：确保文字可读 */
+        .bg-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            background: linear-gradient(180deg, 
+                rgba(5,5,5,0.7) 0%, 
+                rgba(5,5,5,0.4) 40%, 
+                rgba(5,5,5,0.8) 100%);
+            backdrop-filter: blur(3px); /* 轻微模糊背景 */
+            pointer-events: none;
+        }
+
+        /* 🃏 滑动容器 */
+        .snap-x-mandatory { scroll-snap-type: x mandatory; }
+        .snap-center { scroll-snap-align: center; }
+        #slider-container {
+            padding: 0 max(calc(50vw - 130px), 2rem);
+        }
+
+        /* 🌈 卡片渐变 */
+        .card-gradient-1 { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
+        .card-gradient-2 { background: linear-gradient(135deg, #3b82f6 0%, #2dd4bf 100%); }
+        .card-gradient-3 { background: linear-gradient(135deg, #f43f5e 0%, #f59e0b 100%); }
+        .card-gradient-4 { background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); }
+        
+        /* 🥚 头像特效 */
+        .spin-trigger { transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .spin-active { transform: rotate(1080deg); }
+
+        /* 📱 底部 Dock */
+        .bottom-dock {
+            padding-bottom: env(safe-area-inset-bottom);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 3D 特效 */
+        .widget-card {
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out, filter 0.3s ease-out;
+            transform-origin: center center;
+            opacity: 0.6;
+            transform: scale(0.92);
+            filter: blur(1px);
+        }
+        .widget-card.is-active {
+            opacity: 1;
+            transform: scale(1.05);
+            filter: blur(0px);
+            z-index: 10;
+            box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.8);
+        }
+
+        /* 🌍 语言选择器 */
+        .lang-select {
+            appearance: none;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 99px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+            outline: none;
+            text-align: center;
+        }
+        .lang-select option { background: #1e293b; color: white; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="poster-wall-container" class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 p-4 opacity-50">
+        </div>
+    
+    <div class="bg-overlay"></div>
+
+    <div class="absolute top-6 right-6 z-50">
+        <select id="lang-switcher" class="lang-select" onchange="changeLanguage(this.value)">
+            <option value="zh-CN">简体中文</option>
+            <option value="zh-TW">繁體中文</option>
+            <option value="en">English</option>
+        </select>
+    </div>
+
+    <header class="pt-8 px-6 text-center shrink-0 z-10 relative">
+        <div class="relative w-[90px] h-[90px] mx-auto mb-4 group cursor-pointer" onclick="spinAvatar(this)">
+            <div class="absolute -inset-1 bg-[conic-gradient(from_0deg,transparent_0_340deg,white_360deg)] opacity-20 animate-spin-slow rounded-full"></div>
+            <div class="absolute inset-0 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-full blur-md opacity-60"></div>
+            <img src="https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/tubiao/makkawidgets.jpg" 
+                 class="spin-trigger relative w-full h-full rounded-full border-[3px] border-white/90 object-cover z-10 shadow-2xl" 
+                 alt="Avatar">
+        </div>
+        
+        <h1 class="text-3xl font-extrabold tracking-tight mb-1 cursor-pointer select-none active:scale-95 transition-transform" 
+            onclick="randomTitleColor(this)">
+            <span id="title-text" class="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+                MakkaPakka's Widgets
+            </span>
+        </h1>
+        <p id="subtitle" class="text-white/50 text-sm font-medium">左右滑动选择组件</p>
+    </header>
+
+    <main class="flex-grow flex flex-col justify-center py-2 overflow-hidden z-10">
+        <div id="slider-container" 
+             class="flex overflow-x-auto hide-scrollbar snap-x-mandatory gap-4 items-center h-full w-full pb-2">
+            </div>
+    </main>
+
+    <div class="bottom-dock w-full fixed bottom-0 left-0 z-50">
+        
+        <a href="https://t.me/makkapakka777" target="_blank"
+           class="mb-3 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/70 text-xs font-medium backdrop-blur-sm flex items-center hover:bg-white/10 transition-colors">
+            <i class="fa-brands fa-telegram mr-1.5"></i>
+            <span id="contact-btn-text">联系作者</span>
+        </a>
+
+        <div class="w-full max-w-md mx-auto px-6 grid grid-cols-2 gap-4 mb-3">
+            <button onclick="togglePreview(true)"
+               class="flex items-center justify-center py-3.5 rounded-2xl bg-white/10 border border-white/10 text-white font-bold backdrop-blur-md active:scale-95 transition-transform">
+                <i class="fa-solid fa-eye mr-2 text-emerald-400"></i>
+                <span id="btn-preview" class="text-sm">一键导入我的首页</span>
+            </button>
+            
+            <a id="import-all-btn" href="#"
+               class="flex items-center justify-center py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-900/40 active:scale-95 transition-transform">
+                <i class="fa-solid fa-layer-group mr-2"></i>
+                <span id="btn-import-all" class="text-sm">一键导入全部模块</span>
+            </a>
+        </div>
+
+        <div class="text-[10px] text-white/30 font-medium tracking-wide pb-2">
+            © 2026 𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖 • Forward
+        </div>
+    </div>
+
+    <div id="preview-modal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md hidden opacity-0 transition-opacity duration-300">
+        <div class="relative w-full h-full flex flex-col items-center justify-center p-6" onclick="if(event.target===this) togglePreview(false)">
+            <button onclick="togglePreview(false)" class="absolute top-6 right-6 w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white backdrop-blur">
+                <i class="fa-solid fa-times"></i>
+            </button>
+            <div class="max-w-sm w-full bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
+                <div class="p-4 bg-white/5 backdrop-blur border-b border-white/5 flex justify-between items-center">
+                    <span id="modal-title" class="text-white font-bold">下滑预览</span>
+                    <span class="text-xs text-rose-400 bg-rose-400/10 px-2 py-1 rounded">Forward ≥ 1.3.14</span>
+                </div>
+                <div class="overflow-y-auto flex-1 bg-black/20">
+                    <img src="https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/VIEW3.JPEG" class="w-full h-auto" alt="Preview">
+                </div>
+                <div class="p-4 bg-white/5 backdrop-blur border-t border-white/5">
+                    <a href="https://forward-h5.inch.red/s/makkapakka518" class="block w-full py-3 bg-emerald-500 rounded-xl text-center text-white font-bold shadow-lg shadow-emerald-500/30 active:scale-95 transition-transform">
+                        <span id="modal-btn">确认并导入配置</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 🎬 1. 海报墙逻辑 (TMDB API)
+        // ==========================================
+        
+        // 🔴🔴🔴 请在这里填入你的 TMDB API Key 🔴🔴🔴
+        const TMDB_API_KEY = 'YOUR_TMDB_API_KEY_HERE'; 
+        // 🔴🔴🔴 如果没有 Key，请留空，系统会使用下方备用图片展示效果
+
+        async function initPosterWall() {
+            const container = document.getElementById('poster-wall-container');
+            const posterBaseUrl = 'https://image.tmdb.org/t/p/w300';
+            let posters = [];
+
+            // 备用图片数据 (如果没有 API KEY 则使用这些)
+            const fallbackPosters = [
+                "/api/placeholder/300/450", "/api/placeholder/300/450", 
+                "https://image.tmdb.org/t/p/w300/qA5kPYZA7FkVvqcEfJRoOy4kpHg.jpg", // Sound of Freedom
+                "https://image.tmdb.org/t/p/w300/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg", // Spider-Man
+                "https://image.tmdb.org/t/p/w300/rktDFPbfHfUbArZ6OOOKsXcv0Bm.jpg", // Flash
+                "https://image.tmdb.org/t/p/w300/fiVW06jE7z9YnO4trhaMEdclSiC.jpg", // Fast X
+                "https://image.tmdb.org/t/p/w300/pFlaoHTZeyNkG83vxsAJiGzfSsa.jpg", // Black Adam
+            ];
+
+            try {
+                if (TMDB_API_KEY && TMDB_API_KEY !== 'YOUR_TMDB_API_KEY_HERE') {
+                    // 尝试从 TMDB 拉取热门电影
+                    const response = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${TMDB_API_KEY}&language=zh-CN&page=1`);
+                    const data = await response.json();
+                    if(data.results) {
+                        posters = data.results.map(m => posterBaseUrl + m.poster_path);
+                    }
+                } else {
+                    console.warn('⚠️ 未检测到有效 TMDB API Key，使用备用海报模式。');
+                    // 为了演示效果，我们多复制几次备用海报
+                    posters = [...fallbackPosters, ...fallbackPosters, ...fallbackPosters, ...fallbackPosters];
+                }
+            } catch (e) {
+                console.error("Fetch TMDB Error:", e);
+                posters = fallbackPosters;
+            }
+
+            // 如果海报数量太少，复制几份填满屏幕
+            while (posters.length < 50) {
+                posters = posters.concat(posters);
+            }
+
+            // 生成瀑布流列 (Masonry Column Effect)
+            // 我们手动创建列 HTML 来实现错落感
+            let html = '';
+            // 为了视觉上的错落感，我们给每一列不同的 translateY 动画延迟或初始位置
+            // 这里简单处理，直接堆叠图片
+            posters.slice(0, 60).forEach((src, index) => {
+                // 如果是 placeholder API，为了美观不显示坏图
+                if(src.includes('placeholder')) {
+                     // 使用随机颜色块代替占位符，仅作演示
+                     html += `<div class="poster-img bg-white/10 h-[150px] w-full animate-pulse rounded-lg"></div>`;
+                } else {
+                     html += `<img src="${src}" class="poster-img" loading="lazy" alt="Poster">`;
+                }
+            });
+
+            container.innerHTML = html;
+        }
+
+        // ==========================================
+        // 🔧 2. 原有逻辑 (多语言 + 卡片)
+        // ==========================================
+
+        const i18n = {
+            "zh-CN": {
+                subtitle: "左右滑动选择组件",
+                contact: "联系作者",
+                preview: "一键导入我的首页",
+                importAll: "一键导入全部模块",
+                modalTitle: "下滑预览",
+                modalBtn: "确认并导入配置",
+                addBtn: "添加"
+            },
+            "zh-TW": {
+                subtitle: "左右滑動選擇組件",
+                contact: "聯繫作者",
+                preview: "一鍵導入我的首頁",
+                importAll: "一鍵導入全部模塊",
+                modalTitle: "下滑預覽",
+                modalBtn: "確認並導入配置",
+                addBtn: "添加"
+            },
+            "en": {
+                subtitle: "Swipe to explore widgets",
+                contact: "Contact Author",
+                preview: "Import My Homepage",
+                importAll: "Import All Modules",
+                modalTitle: "Preview",
+                modalBtn: "Confirm & Import",
+                addBtn: "Add"
+            }
+        };
+
+        const config = {
+            forwardBase: "https://gocy.pages.dev/#forward://widget?url=",
+            collectionUrl: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets.fwd",
+            widgets: [
+                { 
+                    id: "anime_omni", 
+                    icon: "fa-ghost", gradient: "card-gradient-1", version: "2.2.4",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/animeone.js",
+                    lang: {
+                        "zh-CN": { title: "二次元全境聚合", desc: "多平台动漫榜单聚合" },
+                        "zh-TW": { title: "二次元全境聚合", desc: "多平台動漫榜單聚合" },
+                        "en": { title: "Anime Omni", desc: "Multi-platform Anime Charts" }
+                    }
+                },
+                { 
+                    id: "trakt_cal", 
+                    icon: "fa-calendar-check", gradient: "card-gradient-3", version: "1.0.8",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/traktkey.js",
+                    lang: {
+                        "zh-CN": { title: "Trakt 追剧日历", desc: "免Key / 个人中心集成" },
+                        "zh-TW": { title: "Trakt 追劇日曆", desc: "免Key / 個人中心集成" },
+                        "en": { title: "Trakt Calendar", desc: "No-Key / Personal Hub" }
+                    }
+                },
+                { 
+                    id: "variety_hub", 
+                    icon: "fa-masks-theater", gradient: "card-gradient-2", version: "2.0.3",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/danyi/zongyi.js",
+                    lang: {
+                        "zh-CN": { title: "全球综艺热度榜", desc: "综艺更新表与热度" },
+                        "zh-TW": { title: "全球綜藝熱度榜", desc: "綜藝更新表與熱度" },
+                        "en": { title: "Variety Hub", desc: "Global Variety Show Trends" }
+                    }
+                },
+                { 
+                    id: "global_tv", 
+                    icon: "fa-clock", gradient: "card-gradient-4", version: "2.0.9",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/zhuijurili-one.js",
+                    lang: {
+                        "zh-CN": { title: "全球追剧时刻表", desc: "剧集/综艺/动漫周更" },
+                        "zh-TW": { title: "全球追劇時刻表", desc: "劇集/綜藝/動漫周更" },
+                        "en": { title: "Global TV Schedule", desc: "Weekly TV/Show/Anime" }
+                    }
+                },
+                { 
+                    id: "western_hub", 
+                    icon: "fa-star", gradient: "card-gradient-1", version: "1.0.2",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/bangdan-one.js",
+                    lang: {
+                        "zh-CN": { title: "欧美风向标", desc: "烂番茄口碑 & 流媒体热度" },
+                        "zh-TW": { title: "歐美風向標", desc: "爛番茄口碑 & 串流熱度" },
+                        "en": { title: "Western Trends", desc: "Rotten Tomatoes & Streaming" }
+                    }
+                },
+                { 
+                    id: "cinephile", 
+                    icon: "fa-film", gradient: "card-gradient-2", version: "1.0.3",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/movielist%26interesting.js",
+                    lang: {
+                        "zh-CN": { title: "影迷宝藏", desc: "系列电影 & 流派探索" },
+                        "zh-TW": { title: "影迷寶藏", desc: "系列電影 & 流派探索" },
+                        "en": { title: "Cinephile Gems", desc: "Series Collections & Genres" }
+                    }
+                },
+                { 
+                    id: "discover", 
+                    icon: "fa-compass", gradient: "card-gradient-3", version: "1.0.4",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/today-one.js",
+                    lang: {
+                        "zh-CN": { title: "探索发现", desc: "今天看什么 / 那年今日" },
+                        "zh-TW": { title: "探索發現", desc: "今天看什麼 / 那年今日" },
+                        "en": { title: "Discovery", desc: "What to Watch / On This Day" }
+                    }
+                },
+                { 
+                    id: "media_hub", 
+                    icon: "fa-network-wired", gradient: "card-gradient-4", version: "1.2.1",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/cn-int-bangdan.js",
+                    lang: {
+                        "zh-CN": { title: "全球影视聚合", desc: "Trakt / 豆瓣 / 平台分流" },
+                        "zh-TW": { title: "全球影視聚合", desc: "Trakt / 豆瓣 / 平台分流" },
+                        "en": { title: "Media Aggregator", desc: "Trakt / Douban / Platforms" }
+                    }
+                },
+                { 
+                    id: "platform", 
+                    icon: "fa-tv", gradient: "card-gradient-1", version: "1.0.5",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/zhijiyong-myself/pingtai.js",
+                    lang: {
+                        "zh-CN": { title: "流媒体独家", desc: "Netflix/HBO/B站自制" },
+                        "zh-TW": { title: "串流獨家", desc: "Netflix/HBO/B站自製" },
+                        "en": { title: "Originals", desc: "Netflix/HBO/Bilibili etc." }
+                    }
+                },
+                { 
+                    id: "danmu", 
+                    icon: "fa-comments", gradient: "card-gradient-2", version: "1.1.3",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/danmuapi-ProMax.js",
+                    lang: {
+                        "zh-CN": { title: "弹幕 Pro", desc: "多源API & 繁简转换" },
+                        "zh-TW": { title: "彈幕 Pro", desc: "多源API & 繁簡轉換" },
+                        "en": { title: "Danmu Pro", desc: "Multi-Source API & Convert" }
+                    }
+                },
+                { 
+                    id: "imdb", 
+                    icon: "fa-ranking-star", gradient: "card-gradient-3", version: "1.0.3",
+                    url: "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/widgets/hebingban/imdb%26cn.js",
+                    lang: {
+                        "zh-CN": { title: "IMDb 热榜", desc: "全球权威影视热榜" },
+                        "zh-TW": { title: "IMDb 熱榜", desc: "全球權威影視熱榜" },
+                        "en": { title: "IMDb Charts", desc: "Global Top Trending" }
+                    }
+                }
+            ]
+        };
+
+        let currentLang = 'zh-CN';
+
+        document.getElementById('import-all-btn').href = config.forwardBase + encodeURIComponent(config.collectionUrl);
+        const slider = document.getElementById('slider-container');
+
+        function renderWidgets() {
+            slider.innerHTML = ''; 
+            config.widgets.forEach((w, i) => {
+                const gradientClass = `card-gradient-${(i % 4) + 1}`;
+                const link = config.forwardBase + encodeURIComponent(w.url);
+                const txt = w.lang[currentLang] || w.lang['zh-CN'];
+                const addText = i18n[currentLang].addBtn;
+                const card = `
+                    <div class="snap-center widget-card shrink-0 w-[60vw] sm:w-[260px] h-[290px] relative rounded-[1.8rem] overflow-hidden flex flex-col group active:scale-95">
+                        <div class="absolute inset-0 ${gradientClass} opacity-90"></div>
+                        <div class="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+                        
+                        <div class="relative z-10 h-full p-6 flex flex-col justify-between text-white">
+                            <div>
+                                <div class="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xl mb-4 shadow-lg border border-white/20">
+                                    <i class="fa-solid ${w.icon}"></i>
+                                </div>
+                                <h3 class="text-xl font-bold leading-tight mb-2 drop-shadow-md">${txt.title}</h3>
+                                <p class="text-white/80 text-xs font-medium leading-relaxed line-clamp-2">${txt.desc}</p>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-[10px] font-mono bg-black/20 px-2 py-0.5 rounded-md">v${w.version}</span>
+                                </div>
+                                <a href="${link}" class="flex items-center justify-center w-full py-2.5 bg-white text-slate-900 rounded-xl font-bold shadow-xl hover:bg-slate-100 transition-colors text-sm">
+                                    <i class="fa-solid fa-plus mr-2 text-[10px]"></i> ${addText}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                slider.innerHTML += card;
+            });
+            updateSliderEffect();
+        }
+
+        function changeLanguage(lang) {
+            currentLang = lang;
+            const t = i18n[lang];
+            document.getElementById('subtitle').innerText = t.subtitle;
+            document.getElementById('contact-btn-text').innerText = t.contact;
+            document.getElementById('btn-preview').innerText = t.preview;
+            document.getElementById('btn-import-all').innerText = t.importAll;
+            document.getElementById('modal-title').innerText = t.modalTitle;
+            document.getElementById('modal-btn').innerText = t.modalBtn;
+            renderWidgets();
+        }
+
+        function updateSliderEffect() {
+            const container = slider;
+            const center = container.scrollLeft + container.offsetWidth / 2;
+            const cards = document.querySelectorAll('.widget-card');
+
+            cards.forEach(card => {
+                const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+                const distance = Math.abs(center - cardCenter);
+                if (distance < container.offsetWidth * 0.35) {
+                    card.classList.add('is-active');
+                } else {
+                    card.classList.remove('is-active');
+                }
+            });
+        }
+
+        slider.addEventListener('scroll', updateSliderEffect);
+        
+        // 🚀 初始化
+        renderWidgets();
+        initPosterWall(); // 启动海报墙
+        setTimeout(updateSliderEffect, 100);
+
+        function spinAvatar(el) {
+            const img = el.querySelector('img');
+            img.classList.remove('spin-active');
+            void img.offsetWidth; 
+            img.classList.add('spin-active');
+            if(navigator.vibrate) navigator.vibrate(50);
+        }
+
+        function randomTitleColor(el) {
+            const text = document.getElementById('title-text');
+            const colors = ['from-blue-400 to-purple-400', 'from-green-400 to-cyan-400', 'from-yellow-400 to-red-400', 'from-pink-400 to-rose-400'];
+            const newColor = colors[Math.floor(Math.random() * colors.length)];
+            text.className = `bg-clip-text text-transparent bg-gradient-to-r ${newColor} transition-all duration-500`;
+        }
+
+        function togglePreview(show) {
+            const modal = document.getElementById('preview-modal');
+            if (show) {
+                modal.classList.remove('hidden');
+                setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            } else {
+                modal.classList.add('opacity-0');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+            }
+        }
+    </script>
+</body>
+</html>
