@@ -1,8 +1,8 @@
 var WidgetMetadata = {
     id: "missav", // 还原ID
     title: "MissAV",
-    description: "\u83b7\u53d6 MissAV \u63a8\u8350", // 还原原本的描述编码
-    author: "\ud835\udcd1\ud835\udcfe\ud835\udcfd\ud835\udcfd\ud835\udcee\ud835\\udcfb\ud835\udcef\ud835\udcf5\ud835\udd02", // 还原那个乱码作者名
+    description: "Missav", // 还原原本的描述编码
+    author: "test", // 还原那个乱码作者名
     site: "https://for-ward.vercel.app", // 【关键】还原原本的站点，千万别改回 missav.com
     version: "1.0.0",
     requiredVersion: "0.0.2",
