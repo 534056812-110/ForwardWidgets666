@@ -1,29 +1,17 @@
-const CONFIG = {
-    BASE_URL: "https://jable.tv",
-    // 通用的列表加载后缀
-    COMMON_SUFFIX: "?mode=async&function=get_block&block_id=list_videos_common_videos_list",
-    // 搜索专用的后缀
-    SEARCH_SUFFIX: "?mode=async&function=get_block&block_id=list_videos_videos_list_search_result",
-    headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://jable.tv/",
-    }
-};
-
 WidgetMetadata = {
-    id: "jable_makka_pro",
+    id: "jable_pro_optimized_v3",
     title: "Jable Pro",
-    description: "Jable 增强版 - 支持手动搜索筛选",
+    description: "支持在分类中手动输入关键词进行搜索。",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     site: "https://jable.tv",
-    version: "1.0.2",
+    version: "2.1.0",
     requiredVersion: "0.0.2",
     detailCacheDuration: 60,
     modules: [
         // --- 搜索模块 ---
         {
-            title: "搜索",
-            functionName: "searchWrapper", // 统一入口
+            title: "🔍 全局搜索",
+            functionName: "searchWrapper",
             type: "list",
             params: [
                 { name: "keyword", title: "关键词", type: "input", value: "" },
@@ -44,7 +32,7 @@ WidgetMetadata = {
         },
         // --- 热门模块 ---
         {
-            title: "热门",
+            title: "🔥 热门榜单",
             functionName: "loadListWrapper",
             type: "list",
             params: [
@@ -66,7 +54,7 @@ WidgetMetadata = {
         },
         // --- 最新模块 ---
         {
-            title: "最新",
+            title: "🆕 最新更新",
             functionName: "loadListWrapper",
             type: "list",
             params: [
@@ -77,7 +65,7 @@ WidgetMetadata = {
                     type: "enumeration",
                     value: "post_date",
                     enumOptions: [
-                        { title: "最新发布", value: "post_date" }, // 修正 key
+                        { title: "最新发布", value: "post_date" },
                         { title: "最多观看", value: "video_viewed" },
                         { title: "最多收藏", value: "most_favourited" },
                     ],
@@ -87,7 +75,7 @@ WidgetMetadata = {
         },
         // --- 中文模块 ---
         {
-            title: "中文",
+            title: "🇨🇳 中文",
             functionName: "loadListWrapper",
             type: "list",
             params: [
@@ -100,7 +88,6 @@ WidgetMetadata = {
                     enumOptions: [
                         { title: "最近更新", value: "post_date" },
                         { title: "最多观看", value: "video_viewed" },
-                        { title: "最多收藏", value: "most_favourited" },
                     ],
                 },
                 { name: "page", title: "页码", type: "page", value: "1" },
@@ -108,13 +95,13 @@ WidgetMetadata = {
         },
         // --- 女优模块 (带手动输入) ---
         {
-            title: "女优",
+            title: "💃 女优",
             functionName: "loadCategoryWrapper",
             type: "list",
             params: [
                 {
                     name: "manual_input",
-                    title: "🔍 手动搜索 (选填)",
+                    title: "🔍 手动搜索 (优先使用)",
                     type: "input",
                     description: "输入女优名字，将忽略下方选择",
                     value: ""
@@ -155,7 +142,6 @@ WidgetMetadata = {
                     enumOptions: [
                         { title: "最近更新", value: "post_date" },
                         { title: "最多观看", value: "video_viewed" },
-                        { title: "最多收藏", value: "most_favourited" },
                     ],
                 },
                 { name: "page", title: "页码", type: "page", value: "1" },
@@ -163,13 +149,13 @@ WidgetMetadata = {
         },
         // --- 衣着模块 (带手动输入) ---
         {
-            title: "衣着",
+            title: "👙 衣着",
             functionName: "loadCategoryWrapper",
             type: "list",
             params: [
                 {
                     name: "manual_input",
-                    title: "🔍 手动搜索 (选填)",
+                    title: "🔍 手动搜索 (优先使用)",
                     type: "input",
                     description: "输入标签名，将忽略下方选择",
                     value: ""
@@ -204,13 +190,13 @@ WidgetMetadata = {
         },
         // --- 剧情模块 (带手动输入) ---
         {
-            title: "剧情",
+            title: "🎬 剧情",
             functionName: "loadCategoryWrapper",
             type: "list",
             params: [
                 {
                     name: "manual_input",
-                    title: "🔍 手动搜索 (选填)",
+                    title: "🔍 手动搜索 (优先使用)",
                     type: "input",
                     description: "输入关键词，将忽略下方选择",
                     value: ""
@@ -242,13 +228,13 @@ WidgetMetadata = {
         },
         // --- 角色模块 (带手动输入) ---
         {
-            title: "角色",
+            title: "🎭 角色",
             functionName: "loadCategoryWrapper",
             type: "list",
             params: [
                 {
                     name: "manual_input",
-                    title: "🔍 手动搜索 (选填)",
+                    title: "🔍 手动搜索 (优先使用)",
                     type: "input",
                     value: ""
                 },
@@ -275,6 +261,17 @@ WidgetMetadata = {
     ],
 };
 
+// ================= 常量定义 (放在 Metadata 之后) =================
+
+const CONFIG = {
+    BASE_URL: "https://jable.tv",
+    COMMON_SUFFIX: "?mode=async&function=get_block&block_id=list_videos_common_videos_list",
+    SEARCH_SUFFIX: "?mode=async&function=get_block&block_id=list_videos_videos_list_search_result",
+    headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://jable.tv/",
+    }
+};
 
 // ================= 业务逻辑 =================
 
@@ -289,11 +286,11 @@ async function loadListWrapper(params) {
     return await fetchAndParse(url, params.sort_by, params.page);
 }
 
-// 3. 分类/标签包装器（核心改动：支持手动输入）
+// 3. 分类/标签包装器（支持手动输入）
 async function loadCategoryWrapper(params) {
-    // 如果用户在手动输入框填了字，优先执行搜索，忽略 Path
+    // 逻辑优化：只要手动输入框有内容，直接切换为搜索模式
     if (params.manual_input && params.manual_input.trim().length > 0) {
-        return await executeSearch(params.manual_input, params.sort_by, params.page);
+        return await executeSearch(params.manual_input.trim(), params.sort_by, params.page);
     }
     
     // 否则使用下拉菜单选中的 Path
@@ -349,11 +346,10 @@ async function fetchAndParse(url, sortBy, page) {
             // 提取封面
             const $img = $el.find("img").first();
             let cover = $img.attr("data-src") || $img.attr("src");
-            // 尝试获取动态预览图
             const preview = $img.attr("data-preview") || cover;
 
             // 提取标题和时长
-            const title = $link.text().trim(); // 使用 trim 去除空白
+            const title = $link.text().trim(); 
             const duration = $el.find(".absolute-bottom-right .label").text().trim();
             const viewCount = $el.find(".absolute-bottom-left .label").text().trim();
 
@@ -361,9 +357,9 @@ async function fetchAndParse(url, sortBy, page) {
                 id: href,
                 type: "url", // 必须是 url 类型才能进入详情页
                 title: title,
-                backdropPath: cover, // 横向封面
-                posterPath: cover,   // 竖向封面(复用)
-                previewUrl: preview, // 鼠标悬停/长按预览
+                backdropPath: cover, 
+                posterPath: cover,   
+                previewUrl: preview, 
                 link: href,
                 mediaType: "movie",
                 description: `时长: ${duration} | 观看: ${viewCount}`,
@@ -372,15 +368,13 @@ async function fetchAndParse(url, sortBy, page) {
             });
         });
 
-        // 如果解析为空，可能是到底了或者反爬，返回空数组
         return items;
 
     } catch (e) {
         console.error("Fetch Error:", e);
-        // 出错返回错误提示项，方便调试
         return [{
             title: "加载失败",
-            description: e.message,
+            description: "请检查网络或稍后重试",
             type: "text"
         }];
     }
@@ -403,8 +397,7 @@ async function loadDetail(link) {
 
         const $ = Widget.html.load(html);
         
-        // 尝试提取更多元数据
-        const title = $("meta[property='og:title']").attr("content") || "Jable Video";
+        const title = $("meta[property='og:title']").attr("content") || "Video";
         const cover = $("meta[property='og:image']").attr("content") || "";
         
         // 提取相关推荐
@@ -434,12 +427,11 @@ async function loadDetail(link) {
             backdropPath: cover,
             mediaType: "movie",
             playerType: "system",
-            // 必须带 Referer 否则无法播放
             customHeaders: {
                 "Referer": link,
                 "User-Agent": CONFIG.headers["User-Agent"]
             },
-            childItems: relatedItems // 显示相关推荐
+            childItems: relatedItems
         };
 
     } catch (e) {
