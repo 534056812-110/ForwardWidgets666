@@ -1,75 +1,105 @@
 var WidgetMetadata = {
-    id: "missav", // 还原ID
-    title: "MissAV",
-    description: "Missav", // 还原原本的描述编码
-    author: "test", // 还原那个乱码作者名
-    site: "https://for-ward.vercel.app", // 【关键】还原原本的站点，千万别改回 missav.com
+    id: "missav_test",
+    title: "MissAVtest",
+    description: "获取 MissAV 推荐",
+    author: "test", 
+    site: "https://for-ward.vercel.app", // 保持原样，防止出现证书错误
     version: "1.0.0",
     requiredVersion: "0.0.2",
     detailCacheDuration: 300,
     modules: [
         {
-            title: "\u641c\u7d22\u5f71\u7247", // "搜索影片"
-            description: "\u641c\u7d22 MissAV \u5f71\u7247\u5185\u5bb9",
+            title: "搜索影片",
+            description: "搜索 MissAV 影片内容",
             requiresWebView: false,
             functionName: "searchVideos",
             cacheDuration: 1800,
             params: [
                 {
                     name: "keyword",
-                    title: "\u641c\u7d22\u5173\u952e\u8bcd",
+                    title: "搜索关键词",
                     type: "input",
-                    description: "\u8f93\u5165\u641c\u7d22\u5173\u952e\u8bcd",
+                    description: "输入搜索关键词",
                 },
                 { name: "page", title: "页码", type: "page", value: "1" }
             ]
         },
-        // --- 仅修改此处：合并后的热门榜单 ---
         {
-            title: "热门榜单",
-            description: "查看热门排行",
+            title: "每周热门",
+            description: "查看每周热门",
             requiresWebView: false,
-            functionName: "loadPage", // 复用 loadPage
+            functionName: "loadPage",
             cacheDuration: 1800,
             params: [
                 {
                     name: "url",
-                    title: "榜单类型",
-                    type: "enumeration",
-                    value: "https://missav.com/cn/weekly-hot",
-                    enumOptions: [
-                        { title: "今日热门", value: "https://missav.com/cn/today-hot" },
-                        { title: "本周热门", value: "https://missav.com/cn/weekly-hot" },
-                        { title: "本月热门", value: "https://missav.com/cn/monthly-hot" },
-                        { title: "最新发布", value: "https://missav.com/cn/new" },
-                        { title: "无码流出", value: "https://missav.com/cn/uncensored-leak" }
-                    ]
+                    title: "url",
+                    type: "constant",
+                    value: "https://missav.com/cn/weekly-hot"
                 },
                 { name: "page", title: "页码", type: "page", value: "1" }
             ]
         },
-        // --- 仅修改此处：合并后的分类精选 ---
         {
-            title: "分类精选",
-            description: "按类型浏览",
+            title: "今日热门",
+            description: "查看今日热门",
             requiresWebView: false,
-            functionName: "loadPage", // 复用 loadPage
+            functionName: "loadPage",
             cacheDuration: 1800,
             params: [
                 {
                     name: "url",
-                    title: "分类选择",
-                    type: "enumeration",
-                    value: "https://missav.com/cn/chinese-subtitle",
-                    enumOptions: [
-                        { title: "中文字幕", value: "https://missav.com/cn/chinese-subtitle" },
-                        { title: "FC2系列", value: "https://missav.com/cn/fc2" },
-                        { title: "VR虚拟现实", value: "https://missav.com/cn/vr" },
-                        { title: "个人拍摄", value: "https://missav.com/cn/siro" },
-                        { title: "人妻", value: "https://missav.com/cn/genres/married-woman" },
-                        { title: "制服", value: "https://missav.com/cn/genres/uniform" },
-                        { title: "巨乳", value: "https://missav.com/cn/genres/big-tits" }
-                    ]
+                    title: "url",
+                    type: "constant",
+                    value: "https://missav.com/cn/today-hot"
+                },
+                { name: "page", title: "页码", type: "page", value: "1" }
+            ]
+        },
+        {
+            title: "月度热门",
+            description: "查看月度热门",
+            requiresWebView: false,
+            functionName: "loadPage",
+            cacheDuration: 1800,
+            params: [
+                {
+                    name: "url",
+                    title: "url",
+                    type: "constant",
+                    value: "https://missav.com/cn/monthly-hot"
+                },
+                { name: "page", title: "页码", type: "page", value: "1" }
+            ]
+        },
+        {
+            title: "新片上市",
+            description: "查看新片上市",
+            requiresWebView: false,
+            functionName: "loadPage",
+            cacheDuration: 1800,
+            params: [
+                {
+                    name: "url",
+                    title: "url",
+                    type: "constant",
+                    value: "https://missav.com/cn/new"
+                },
+                { name: "page", title: "页码", type: "page", value: "1" }
+            ]
+        },
+        {
+            title: "无码流出",
+            description: "查看无码流出",
+            requiresWebView: false,
+            functionName: "loadPage",
+            cacheDuration: 1800,
+            params: [
+                {
+                    name: "url",
+                    title: "url",
+                    type: "constant",
+                    value: "https://missav.com/cn/uncensored-leak"
                 },
                 { name: "page", title: "页码", type: "page", value: "1" }
             ]
@@ -78,7 +108,7 @@ var WidgetMetadata = {
 };
 
 // =============================================================
-// 以下是 100% 原始代码，一个字符未动
+// 以下是原始逻辑代码
 // =============================================================
 
 function extractVideoId(url) {
@@ -102,13 +132,10 @@ async function searchVideos(params) {
     return parseHtml(response.data);
 }
 
-// 这里的 loadPage 为了适配新的菜单，稍微做了参数接收的修改，但内部请求逻辑未动
 async function loadPage(params) {
-    // 兼容逻辑：如果是原来的调用方式 params 就是 url，如果是新的菜单 params 是对象
-    var url = params.url || "https://missav.com/cn/weekly-hot";
+    var url = params.url;
     var page = params.page || 1;
     
-    // 拼接页码
     if (url.includes('?')) {
         url = `${url}&page=${page}`;
     } else {
@@ -142,6 +169,7 @@ async function parseHtml(html) {
                 title = linkAnchor.text().trim();
             }
             
+            // 封面图拼接逻辑
             var cover = `https://fourhoi.com/${videoId}/cover-t.jpg`;
             var duration = item.find('.absolute.bottom-1.right-1').text().trim();
 
@@ -176,6 +204,7 @@ async function loadDetail(link) {
         
         var videoUrl = "";
         
+        // 提取视频流地址逻辑
         var uuidMatches = html.match(/uuid: "(.*?)"/);
         if (uuidMatches && uuidMatches.length > 1) {
             videoUrl = `https://surrit.com/${uuidMatches[1]}/playlist.m3u8`;
@@ -191,7 +220,7 @@ async function loadDetail(link) {
             type: "detail",
             videoUrl: videoUrl || link,
             title: title || `${videoCode}`,
-            description: `\u756a\u53f7: ${videoCode}`,
+            description: `番号: ${videoCode}`,
             posterPath: "",
             backdropPath: `https://fourhoi.com/${videoId}/cover-t.jpg`,
             mediaType: "movie",
@@ -215,7 +244,7 @@ async function loadDetail(link) {
             type: "detail",
             videoUrl: link,
             title: `${videoCode}`,
-            description: `\u756a\u53f7: ${videoCode}`,
+            description: `番号: ${videoCode}`,
             posterPath: "",
             backdropPath: `https://fourhoi.com/${videoId}/cover-t.jpg`,
             mediaType: "movie",
