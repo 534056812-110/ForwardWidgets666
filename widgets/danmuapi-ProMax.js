@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "danmu.pro.online",
   title: "LoaVar",
-  version: "1.1.3",
+  version: "5.2.0",
   requiredVersion: "0.0.2",
   description: "支持添加多条api并自命名&繁简互转",
   author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
