@@ -11,7 +11,7 @@ const CONFIG = {
 };
 
 WidgetMetadata = {
-    id: "jable_pro",
+    id: "jable_makka_pro",
     title: "Jable Pro",
     description: "Jable 增强版 - 支持手动搜索筛选",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
