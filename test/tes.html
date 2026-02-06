@@ -28,11 +28,12 @@
     </script>
 
     <style>
-        /* 🌌 基础设置 */
+        /* 🌌 基础设置 & 优化1：深邃背景 */
         body {
-            background-color: #050505;
+            /* 以前是纯黑 #050505，现在改为径向渐变，模拟深空光感 */
+            /* 这样图片没出来之前，背景也是有质感的，不会觉得是"故障" */
+            background: radial-gradient(circle at 50% 20%, #1e1e24 0%, #050505 80%);
             color: white;
-            /* 保持 Flex 布局逻辑，确保不遮挡 */
             height: 100vh;
             height: 100dvh; 
             overflow: hidden;
@@ -45,7 +46,7 @@
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
         /* =========================================
-           🎬 海报墙特效
+           🎬 海报墙特效 (优化2：淡入动画)
         ========================================= */
         #poster-wall-wrapper {
             position: absolute;
@@ -53,11 +54,20 @@
             left: -50%;
             width: 200%;
             height: 200%;
-            z-index: -1;
+            z-index: -2; 
             transform: rotate(-12deg);
             overflow: hidden;
             pointer-events: none;
-            filter: brightness(1.1);
+            
+            /* 初始状态：完全透明 */
+            opacity: 0; 
+            /* 加上一个长达 1.5s 的过渡，实现丝滑显现 */
+            transition: opacity 1.5s ease-out;
+        }
+
+        /* 这是加载完成后JS会添加的类，用来显示海报墙 */
+        #poster-wall-wrapper.is-loaded {
+            opacity: 0.85; /* 恢复到之前的亮度 */
         }
 
         #poster-wall-mover {
@@ -86,30 +96,49 @@
             width: 100%;
             height: auto;
             border-radius: 8px;
-            opacity: 0.75; 
+            opacity: 0.8; 
             transition: opacity 0.3s;
             box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.6);
-            filter: grayscale(10%); 
             object-fit: cover;
             aspect-ratio: 2/3;
         }
 
-        .bg-overlay {
+        /* =========================================
+           🌫️ 渐进式毛玻璃遮挡
+        ========================================= */
+        .blur-overlay-top {
             position: absolute;
-            inset: 0;
-            z-index: -1;
-            background: linear-gradient(180deg, 
-                rgba(5,5,5,0.6) 0%, 
-                rgba(5,5,5,0.3) 40%, 
-                rgba(5,5,5,0.7) 100%);
-            backdrop-filter: blur(1px); 
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 40vh; 
+            z-index: -1; 
             pointer-events: none;
+            backdrop-filter: blur(20px) saturate(110%);
+            -webkit-backdrop-filter: blur(20px) saturate(110%);
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+            -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .blur-overlay-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 40vh; 
+            z-index: -1;
+            pointer-events: none;
+            backdrop-filter: blur(20px) saturate(110%);
+            -webkit-backdrop-filter: blur(20px) saturate(110%);
+            mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+            -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+            background: rgba(255, 255, 255, 0.02);
         }
 
         /* 🃏 滑动容器 */
         .snap-x-mandatory { scroll-snap-type: x mandatory; }
         .snap-center { scroll-snap-align: center; }
-        /* 调整 Padding 以适应较宽的卡片 */
         #slider-container { padding: 0 max(calc(50vw - 140px), 1.5rem); } 
         
         .card-gradient-1 { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
@@ -117,17 +146,24 @@
         .card-gradient-3 { background: linear-gradient(135deg, #f43f5e 0%, #f59e0b 100%); }
         .card-gradient-4 { background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); }
         
-        .spin-trigger { transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
-        .spin-active { transform: rotate(1080deg); }
+        /* 🔄 头像无限旋转动画 */
+        @keyframes spin-one-shot {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(1080deg); } 
+        }
+        
+        .spin-active {
+            animation: spin-one-shot 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
 
-        /* 📱 底部 Dock (Flex 布局核心) */
+        /* 📱 底部 Dock */
         .bottom-dock {
             flex-shrink: 0;
-            padding-bottom: env(safe-area-inset-bottom);
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
-            border-top: 1px solid rgba(255,255,255,0.08);
+            padding-bottom: max(env(safe-area-inset-bottom), 12px);
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border-top: 1px solid rgba(255,255,255,0.05);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -173,7 +209,9 @@
             <div id="poster-grid-2" class="poster-grid"></div>
         </div>
     </div>
-    <div class="bg-overlay"></div>
+    
+    <div class="blur-overlay-top"></div>
+    <div class="blur-overlay-bottom"></div>
 
     <div class="absolute top-6 right-6 z-50">
         <select id="lang-switcher" class="lang-select" onchange="changeLanguage(this.value)">
@@ -188,13 +226,13 @@
             <div class="absolute -inset-1 bg-[conic-gradient(from_0deg,transparent_0_340deg,white_360deg)] opacity-20 animate-spin-slow rounded-full"></div>
             <div class="absolute inset-0 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-full blur-md opacity-60"></div>
             <img src="https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/tubiao/makkawidgets.jpg" 
-                 class="spin-trigger relative w-full h-full rounded-full border-[3px] border-white/90 object-cover z-10 shadow-2xl" 
+                 class="relative w-full h-full rounded-full border-[3px] border-white/90 object-cover z-10 shadow-2xl" 
                  alt="Avatar">
         </div>
         
         <h1 class="text-2xl font-extrabold tracking-tight mb-1 cursor-pointer select-none active:scale-95 transition-transform" 
-            onclick="randomTitleColor(this)">
-            <span id="title-text" class="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+            onclick="randomTitleColor()">
+            <span id="title-text" class="bg-clip-text text-transparent bg-gradient-to-r transition-all duration-500">
                 MakkaPakka's Widgets
             </span>
         </h1>
@@ -207,29 +245,31 @@
         </div>
     </main>
 
-    <div class="bottom-dock w-full z-50">
-        <a href="https://t.me/makkapakka777" target="_blank"
-           class="mb-3 mt-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/70 text-xs font-medium backdrop-blur-sm flex items-center hover:bg-white/10 transition-colors">
-            <i class="fa-brands fa-telegram mr-1.5"></i>
-            <span id="contact-btn-text">联系作者</span>
-        </a>
-
-        <div class="w-full max-w-md mx-auto px-6 grid grid-cols-2 gap-4 mb-3">
+    <div class="bottom-dock w-full z-50 pt-3">
+        <div class="w-full max-w-md mx-auto px-6 grid grid-cols-2 gap-3 mb-2">
             <button onclick="togglePreview(true)"
-               class="flex items-center justify-center py-3.5 rounded-2xl bg-white/10 border border-white/10 text-white font-bold backdrop-blur-md active:scale-95 transition-transform">
-                <i class="fa-solid fa-eye mr-2 text-emerald-400"></i>
-                <span id="btn-preview" class="text-sm">一键导入我的首页</span>
+               class="flex items-center justify-center py-2.5 rounded-xl bg-white/10 border border-white/10 text-white font-bold backdrop-blur-md active:scale-95 transition-transform">
+                <i class="fa-solid fa-eye mr-2 text-emerald-400 text-xs"></i>
+                <span id="btn-preview" class="text-xs tracking-wide">导入我的首页</span>
             </button>
             
             <a id="import-all-btn" href="#"
-               class="flex items-center justify-center py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-900/40 active:scale-95 transition-transform">
-                <i class="fa-solid fa-layer-group mr-2"></i>
-                <span id="btn-import-all" class="text-sm">一键导入全部模块</span>
+               class="flex items-center justify-center py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-900/30 active:scale-95 transition-transform">
+                <i class="fa-solid fa-layer-group mr-2 text-xs"></i>
+                <span id="btn-import-all" class="text-xs tracking-wide">导入全部模块</span>
             </a>
         </div>
 
-        <div class="text-[10px] text-white/30 font-medium tracking-wide pb-2">
-            © 2026 𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖 • Forward
+        <div class="w-full flex items-center justify-center gap-3 opacity-60 scale-90 origin-bottom">
+            <div class="text-[10px] text-white/50 font-medium">
+                © 2026 𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖 • Forward
+            </div>
+            <div class="w-px h-2.5 bg-white/20"></div>
+            <a href="https://t.me/makkapakka777" target="_blank"
+               class="flex items-center text-[10px] text-white/50 hover:text-white transition-colors">
+                <i class="fa-brands fa-telegram mr-1"></i>
+                <span id="contact-btn-text">联系作者</span>
+            </a>
         </div>
     </div>
 
@@ -257,55 +297,52 @@
 
     <script>
         // ==========================================
-        // 🎬 1. 海报墙逻辑
+        // 🎵 音效数据 (Base64)
         // ==========================================
-        const TMDB_API_KEY = ''; 
-        const BACKUP_POSTERS = [
-            "/t6HIqrKwXtvO99nJ9lqCDB01Co.jpg", "/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg", 
-            "/3bhkrj58Vtu7enYsRolD1fZdja1.jpg", "/q6y0Go1r1oFpnJqC6K0jh0W5UP.jpg", 
-            "/pFlaoHTZeyNkG83vxsAJiGzfSsa.jpg", "/u3bZgnGQ9TWA60DkEpiCfAj3ha8.jpg", 
-            "/9GBhzXMFbwvtYYQQDZrm75PaX9a.jpg", "/r7XifzvtezNt31ypvsmb6Oq99Iz.jpg", 
-            "/rugyJdeoJm7cSJL1q4jBpTNbxyU.jpg", "/y5Z0WesTjvn59jP6yo459eUsbli.jpg", 
-            "/1SC8cwQ80562e12bQe4e94Q0d3g.jpg", "/kUFxOgGOIBbKRC1y0W1aX10662D.jpg", 
-            "/qJ2tW6WMUDux911r6m7haRef0WH.jpg", "/gEU2QniL6E8ahDaX06e8q288CLR.jpg", 
-            "/7WsyChQLEftFiDOVTGkv3hFpyyt.jpg", "/8UlWHLMpgZm9bx6QYh0NFoq67TZ.jpg", 
-            "/jRXYjXNq0Cs2TcJjLkki24MLp7u.jpg", "/6oom5QYQ2yQTMJIbnvbkBL9cHo6.jpg", 
-            "/5KCVkau1HEl7ZzfPsKAPM0sMiKc.jpg", "/saHpSkPG8v6KV1bPrdZwE9a4897.jpg", 
-            "/amvmeQWheahG3StKwPF1beyMQ6o.jpg", "/uJYYizSuA9Y3DCs0qS4qWvHfZg4.jpg", 
-            "/s16H6tpK2utvwDtzZ8Qy4qm5dxw.jpg", "/lFSSLTlFozwpaGlO31OoUeopQK5.jpg", 
-            "/lZpWprJqbFTpBGvMzgBSkDbIChD.jpg", "/h6In7sC83B8D9r04fPj1LhXhV6a.jpg", 
-            "/9Rj8l6gElLpRL7Kj17iZhrT5Zuw.jpg", "/zw7OlxpBf34JEzF6rN25sV1OQ0H.jpg", 
-            "/arw2vcBveWOVZr6pxd9XTd1TdQa.jpg", "/fdZpvODTX5wwkD0ikZNaClE4AoW.jpg"
-        ];
+        const popSoundBase64 = "data:audio/mp3;base64,//uQRAAAAWMSLwUIYAAsYkXgoQwAEaYLWfkWgAI0wWs/ItAAAGDxYJjgn//8C0g+FLeaaGnJH/+ta5zkPH7OQ9H640D13atCSMCJg//fQZzwwEskw0015H///84f/84f/9k=";
 
-        async function initPosterWall() {
+        // ==========================================
+        // 🎬 1. 自定义海报墙逻辑 (优化3：加载控制)
+        // ==========================================
+        const POSTER_BASE = "https://raw.githubusercontent.com/MakkaPakka518/ForwardWidgets/refs/heads/main/haibaoqiang/";
+        const TOTAL_POSTERS = 30; 
+
+        function initPosterWall() {
             const grid1 = document.getElementById('poster-grid-1');
             const grid2 = document.getElementById('poster-grid-2');
-            const posterBaseUrl = 'https://image.tmdb.org/t/p/w300';
+            const wrapper = document.getElementById('poster-wall-wrapper');
+            
             let posters = [];
-            try {
-                if (TMDB_API_KEY && TMDB_API_KEY.length > 10) {
-                    const response = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${TMDB_API_KEY}&language=zh-CN&page=1`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.results) posters = data.results.map(m => m.poster_path);
-                    }
-                }
-            } catch (e) {}
-            if (posters.length === 0) posters = [...BACKUP_POSTERS].sort(() => 0.5 - Math.random());
+            for (let i = 1; i <= TOTAL_POSTERS; i++) {
+                posters.push(`${POSTER_BASE}${i}.webp`);
+            }
+            posters.sort(() => 0.5 - Math.random());
             let displayList = [...posters];
-            while (displayList.length < 48) displayList = displayList.concat(posters);
-            let gridHtml = displayList.slice(0, 48).map(path => `<img src="${posterBaseUrl + (path.startsWith('/')?'':'/') + path}" class="poster-img" loading="lazy">`).join('');
-            grid1.innerHTML = gridHtml; grid2.innerHTML = gridHtml;
+            while (displayList.length < 48) {
+                displayList = displayList.concat(posters);
+            }
+            
+            // 渲染HTML
+            const gridHtml = displayList.map(url => 
+                `<img src="${url}" class="poster-img" loading="lazy" alt="Poster">`
+            ).join('');
+            grid1.innerHTML = gridHtml;
+            grid2.innerHTML = gridHtml;
+
+            // 🌟 核心优化：延迟一小会儿，让图片开始请求后，再把背景淡入
+            // 配合 CSS 的 opacity: 0 和 transition
+            setTimeout(() => {
+                wrapper.classList.add('is-loaded');
+            }, 300); 
         }
 
         // ==========================================
         // 🔧 2. 主要逻辑
         // ==========================================
         const i18n = {
-            "zh-CN": { subtitle: "左右滑动选择组件", contact: "联系作者", preview: "一键导入我的首页", importAll: "一键导入全部模块", modalTitle: "下滑预览", modalBtn: "确认并导入配置", addBtn: "添加" },
-            "zh-TW": { subtitle: "左右滑動選擇組件", contact: "聯繫作者", preview: "一鍵導入我的首頁", importAll: "一鍵導入全部模塊", modalTitle: "下滑預覽", modalBtn: "確認並導入配置", addBtn: "添加" },
-            "en": { subtitle: "Swipe to explore widgets", contact: "Contact Author", preview: "Import My Homepage", importAll: "Import All Modules", modalTitle: "Preview", modalBtn: "Confirm & Import", addBtn: "Add" }
+            "zh-CN": { subtitle: "左右滑动选择组件", contact: "联系作者", preview: "导入我的首页", importAll: "导入全部模块", modalTitle: "下滑预览", modalBtn: "确认并导入配置", addBtn: "添加" },
+            "zh-TW": { subtitle: "左右滑動選擇組件", contact: "聯繫作者", preview: "導入我的首頁", importAll: "導入全部模塊", modalTitle: "下滑預覽", modalBtn: "確認並導入配置", addBtn: "添加" },
+            "en": { subtitle: "Swipe to explore widgets", contact: "Contact Author", preview: "Import Homepage", importAll: "Import All Modules", modalTitle: "Preview", modalBtn: "Confirm & Import", addBtn: "Add" }
         };
 
         const config = {
@@ -330,6 +367,16 @@
         document.getElementById('import-all-btn').href = config.forwardBase + encodeURIComponent(config.collectionUrl);
         const slider = document.getElementById('slider-container');
 
+        // 🎨 渐变色池
+        const titleColors = [
+            'from-blue-400 to-purple-400',
+            'from-green-400 to-cyan-400',
+            'from-yellow-400 to-red-400',
+            'from-pink-400 to-rose-400',
+            'from-indigo-400 to-cyan-400',
+            'from-orange-400 to-pink-500'
+        ];
+
         function renderWidgets() {
             slider.innerHTML = ''; 
             config.widgets.forEach((w, i) => {
@@ -337,8 +384,6 @@
                 const link = config.forwardBase + encodeURIComponent(w.url);
                 const txt = w.lang[currentLang] || w.lang['zh-CN'];
                 
-                // 💎 修改点：改回了较宽、较矮的经典比例
-                // w-[64vw] (宽), h-[300px] (适中)
                 const card = `
                     <div class="snap-center widget-card shrink-0 w-[64vw] sm:w-[280px] h-[300px] relative rounded-[1.8rem] overflow-hidden flex flex-col group active:scale-95">
                         <div class="absolute inset-0 ${gradientClass} opacity-90"></div>
@@ -394,20 +439,25 @@
         }
         slider.addEventListener('scroll', updateSliderEffect);
         
-        renderWidgets();
-        initPosterWall(); 
-        setTimeout(updateSliderEffect, 100);
-
+        // 💫 旋转 + 音效
         function spinAvatar(el) {
+            const audio = new Audio(popSoundBase64);
+            audio.volume = 0.5; 
+            audio.play().catch(e => console.log('Audio error:', e));
+
             const img = el.querySelector('img');
-            img.classList.remove('spin-active'); void img.offsetWidth; img.classList.add('spin-active');
+            img.classList.remove('spin-active');
+            void img.offsetWidth; 
+            img.classList.add('spin-active');
+            
             if(navigator.vibrate) navigator.vibrate(50);
         }
 
-        function randomTitleColor(el) {
+        // 🎨 随机标题颜色
+        function randomTitleColor() {
             const text = document.getElementById('title-text');
-            const colors = ['from-blue-400 to-purple-400', 'from-green-400 to-cyan-400', 'from-yellow-400 to-red-400', 'from-pink-400 to-rose-400'];
-            text.className = `bg-clip-text text-transparent bg-gradient-to-r ${colors[Math.floor(Math.random() * colors.length)]} transition-all duration-500`;
+            const newColor = titleColors[Math.floor(Math.random() * titleColors.length)];
+            text.className = `bg-clip-text text-transparent bg-gradient-to-r ${newColor} transition-all duration-500`;
         }
 
         function togglePreview(show) {
@@ -415,6 +465,13 @@
             if (show) { modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10); }
             else { modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); }
         }
+
+        // 🚀 初始化
+        renderWidgets();
+        initPosterWall(); 
+        randomTitleColor(); 
+        setTimeout(updateSliderEffect, 100);
+
     </script>
 </body>
 </html>
