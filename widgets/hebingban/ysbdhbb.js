@@ -334,4 +334,23 @@ async function dispatchImdb(params) {
 
 // --- 猫眼逻辑 ---
 async function getMaoyanHot(params) {
-    var url = "https://
+    var url = "https://i.maoyan.com/api/mmdb/movie/v3/list/hot.json?ct=%E8%A5%BF%E5%AE%81&ci=42&channelId=4";
+    try {
+        var res = await Widget.http.get(url, { headers: { "User-Agent": UA_MOBILE } });
+        var json = JSON.parse(res.data);
+        var list = json.data.hot || [];
+        var items = [];
+        list.forEach(function(item) {
+            items.push({
+                title: item.nm,
+                subTitle: "评分: " + item.sc,
+                posterPath: item.img.replace('w.h', '128.180'),
+                link: "https://m.maoyan.com/movie/" + item.id,
+                type: "url"
+            });
+        });
+        return items;
+    } catch(e) {
+        return [];
+    }
+}
